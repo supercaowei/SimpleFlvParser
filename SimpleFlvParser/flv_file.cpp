@@ -2,7 +2,9 @@
 #include "flv_file_internal.h"
 #include "utils.h"
 
+#ifdef _WIN32
 #pragma  warning(disable: 4996)
+#endif
 
 FlvFile::FlvFile(const std::string& flv_path)
 {
