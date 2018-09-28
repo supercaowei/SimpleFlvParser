@@ -1,0 +1,5 @@
+#ifndef _SFP_OUTPUT_INTERFACE_H_
+#define _SFP_OUTPUT_INTERFACE_H_
+
+
+#endif
