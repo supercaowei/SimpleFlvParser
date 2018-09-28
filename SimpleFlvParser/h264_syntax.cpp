@@ -185,9 +185,9 @@ void read_scaling_list(BitReader& b, uint8_t* scalingList, int sizeOfScalingList
 
 void read_rbsp_trailing_bits(BitReader& b)
 {
-	int rbsp_stop_one_bit = b.ReadU1(); // equal to 1
+	b.ReadU1(); // rbsp_stop_one_bit, equal to 1
 	while (!b.IsByteAligned())
-		int rbsp_alignment_zero_bit = b.ReadU1(); // equal to 0
+		b.ReadU1(); // rbsp_alignment_zero_bit, equal to 0
 }
 
 void read_seq_parameter_set_rbsp(sps_t* sps, BitReader& b)
