@@ -630,6 +630,9 @@ VideoTagBodySPSPPS::VideoTagBodySPSPPS(ByteReader& data)
 
 VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)
 {
+	if (data.RemainingSize() < 3)
+		return;
+	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 	video_tag_type_ = VideoTagTypeAVCSequenceEnd;
 	is_good_ = true;
 }
