@@ -2,8 +2,10 @@
 //
 
 #include "simple_flv_parser.h"
-#include "utils.h"
 #include "flv_file.h"
+#include "db_output.h"
+#include "text_output.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +19,38 @@ int main(int argc, char* argv[])
 {
 	if (parse_args(argc, argv) < 0)
 		return -1;
+
+	std::shared_ptr<FlvFile> flv;
+	std::shared_ptr<FlvOutputInterface> output;
+	std::shared_ptr<FlvHeaderInterface> header;
+	std::shared_ptr<FlvTagInterface> tag;
+	std::shared_ptr<NaluInterface> nalu;
+
+	//begin parsing flv file
+	flv = std::make_shared<FlvFile>(flv_file);
+
+	//open an output
+
+	//flv header output
+	header = flv->GetFlvHeader();
+	output->FlvHeaderOutput(header);
+
+	//flv tags output
+	do 
+	{
+		tag = flv->EnumFlvTag();
+		if (tag)
+			output->FlvTagOutput(tag);
+	} while (tag);
+	
+	//H.264 NAL units output
+	do 
+	{
+		nalu = flv->EnumNalu();
+		if (nalu)
+			output->NaluOutput(nalu);
+	} while (nalu);
+
 	return 0;
 }
 
@@ -25,8 +59,6 @@ int parse_args(int argc, char* argv[])
 	for (int i = 0; i < argc; i++)
 		printf("%s ", argv[i]);
 	printf("\n");
-
-	std::shared_ptr<FlvFile> flv;
 
 	if (argc < 2)
 		goto help;
@@ -74,9 +106,6 @@ int parse_args(int argc, char* argv[])
 		printf("Flv file %s doesn't exist.\n", flv_file.c_str());
 		return -2;
 	}
-
-	//begin parsing flv file
-	flv = std::make_shared<FlvFile>(flv_file);
 
 	return 0;
 

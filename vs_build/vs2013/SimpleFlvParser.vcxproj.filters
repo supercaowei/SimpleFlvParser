@@ -21,5 +21,6 @@
     <ClInclude Include="..\..\SimpleFlvParser\bytes.h" />
     <ClInclude Include="..\..\SimpleFlvParser\amf.h" />
     <ClInclude Include="..\..\SimpleFlvParser\h264_syntax.h" />
+    <ClInclude Include="..\..\SimpleFlvParser\input_interface.h" />
   </ItemGroup>
 </Project>

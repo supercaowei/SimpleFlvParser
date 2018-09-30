@@ -54,3 +54,19 @@ FlvFile::~FlvFile()
 
 }
 
+std::shared_ptr<FlvHeaderInterface> FlvFile::GetFlvHeader()
+{
+	return std::shared_ptr<FlvHeaderInterface>(nullptr);
+}
+
+std::shared_ptr<FlvTagInterface> FlvFile::EnumFlvTag()
+{
+	return std::shared_ptr<FlvTagInterface>(nullptr);
+}
+
+std::shared_ptr<NaluInterface> FlvFile::EnumNalu()
+{
+	return std::shared_ptr<NaluInterface>(nullptr);
+}
+
+

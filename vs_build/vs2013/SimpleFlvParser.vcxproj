@@ -27,6 +27,7 @@
     <ClInclude Include="..\..\SimpleFlvParser\flv_file.h" />
     <ClInclude Include="..\..\SimpleFlvParser\flv_file_internal.h" />
     <ClInclude Include="..\..\SimpleFlvParser\h264_syntax.h" />
+    <ClInclude Include="..\..\SimpleFlvParser\input_interface.h" />
     <ClInclude Include="..\..\SimpleFlvParser\output_interface.h" />
     <ClInclude Include="..\..\SimpleFlvParser\simple_flv_parser.h" />
     <ClInclude Include="..\..\SimpleFlvParser\text_output.h" />

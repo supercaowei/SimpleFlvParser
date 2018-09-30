@@ -1,6 +1,8 @@
 #ifndef _SFP_FLV_FILE_H_
 #define _SFP_FLV_FILE_H_
 
+#include "input_interface.h"
+
 #include <memory>
 #include <string>
 #include <list>
@@ -15,8 +17,10 @@ public:
 	~FlvFile();
 	bool IsGood() { return is_good_; }
 
-private:
-
+public:
+	std::shared_ptr<FlvHeaderInterface> GetFlvHeader();
+	std::shared_ptr<FlvTagInterface> EnumFlvTag();
+	std::shared_ptr<NaluInterface> EnumNalu();
 
 private:
 	bool is_good_ = false;
