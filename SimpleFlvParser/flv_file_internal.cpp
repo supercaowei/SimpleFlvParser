@@ -6,6 +6,7 @@
 #define FLV_TAG_HEADER_SIZE       11
 #define FLV_VIDEO_TAG_HEADER_SIZE 5
 #define FLV_AUDIO_TAG_HEADER_SIZE 1
+#define UNKNOWN "Unknown"
 
 FlvHeader::FlvHeader(ByteReader& data)
 {
@@ -30,6 +31,36 @@ FlvHeader::FlvHeader(ByteReader& data)
 
 	if (header_size_ > FLV_HEADER_SIZE)
 		data.ReadBytes(header_size_ - FLV_HEADER_SIZE);
+}
+
+bool FlvHeader::HaveVideo()
+{
+	return has_video_;
+}
+
+bool FlvHeader::HaveAudio()
+{
+	return has_audio_;
+}
+
+uint8_t FlvHeader::Version()
+{
+	return version_;
+}
+
+std::string GetFlvTagTypeString(FlvTagType type)
+{
+	switch (type)
+	{
+	case FlvTagTypeAudio:
+		return "AudioTag";
+	case FlvTagTypeVideo:
+		return "VideoTag";
+	case FlvTagTypeScriptData:
+		return "Script";
+	default:
+		return "UnknownTagType";
+	}
 }
 
 FlvTagHeader::FlvTagHeader(ByteReader& data)
@@ -88,6 +119,72 @@ FlvTag::FlvTag(ByteReader& data, int tag_serial)
 	is_good_ = true;
 }
 
+int FlvTag::Serial()
+{
+	return tag_serial_;
+}
+
+uint32_t FlvTag::PreviousTagSize()
+{
+	return previous_tag_size_;
+}
+
+std::string FlvTag::TagType()
+{
+	if (tag_header_)
+		return GetFlvTagTypeString(tag_header_->tag_type_);
+	return "";
+}
+
+uint32_t FlvTag::StreamId()
+{
+	if (tag_header_)
+		return tag_header_->stream_id_;
+	return 0;
+}
+
+uint32_t FlvTag::TagSize()
+{
+	if (tag_header_)
+		return FLV_TAG_HEADER_SIZE + tag_header_->tag_data_size_;
+	return 0;
+}
+
+uint32_t FlvTag::Pts()
+{
+	if (tag_header_ && tag_data_)
+		return tag_header_->timestamp_ + tag_data_->GetCts();
+	return 0;
+}
+
+uint32_t FlvTag::Dts()
+{
+	if (tag_header_)
+		return tag_header_->timestamp_;
+	return 0;
+}
+
+std::string FlvTag::SubType()
+{
+	if (tag_data_)
+		return tag_data_->GetSubTypeString();
+	return "";
+}
+
+std::string FlvTag::Format()
+{
+	if (tag_data_)
+		return tag_data_->GetFormatString();
+	return "";
+}
+
+std::string FlvTag::ExtraInfo()
+{
+	if (tag_data_)
+		return tag_data_->GetExtraInfo();
+	return "";
+}
+
 std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type)
 {
 	if (data.RemainingSize() < tag_data_size)
@@ -125,8 +222,6 @@ FlvTagDataScript::FlvTagDataScript(ByteReader& data)
 	DecodeAMF(&amf, script_data_);
 	if (script_data_.isNull() || (!script_data_.isObject() && !script_data_.isArray()))
 		return;
-
-	printf("%s\n", script_data_.toStyledString().c_str());
 
 	is_good_ = true;
 }
@@ -186,6 +281,23 @@ FlvTagDataAudio::FlvTagDataAudio(ByteReader& data)
 		return;
 
 	is_good_ = true;
+}
+
+std::string FlvTagDataAudio::GetSubTypeString()
+{
+	if (audio_tag_body_)
+		return GetAudioTagTypeString(audio_tag_body_->GetAudioTagType());
+	return __super::GetSubTypeString();
+}
+
+std::string FlvTagDataAudio::GetFormatString()
+{
+	return "";
+}
+
+std::string FlvTagDataAudio::GetExtraInfo()
+{
+	return "";
 }
 
 AudioTagHeader::AudioTagHeader(ByteReader& data)
@@ -251,6 +363,19 @@ AudioTagHeader::AudioTagHeader(ByteReader& data)
 	}
 
 	is_good_ = true;
+}
+
+std::string GetAudioTagTypeString(AudioTagType type)
+{
+	switch (type)
+	{
+	case AudioTagTypeAACConfig:
+		return "AAC Config Frame";
+	case AudioTagTypeAACData:
+		return "AAC Data Frame";
+	default:
+		return UNKNOWN;
+	}
 }
 
 std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat audio_format)
@@ -324,6 +449,30 @@ FlvTagDataVideo::FlvTagDataVideo(ByteReader& data)
 	is_good_ = true;
 }
 
+uint32_t FlvTagDataVideo::GetCts()
+{
+	if (video_tag_body_)
+		return video_tag_body_->GetCts();
+	return __super::GetCts();
+}
+
+std::string FlvTagDataVideo::GetSubTypeString()
+{
+	if (video_tag_body_)
+		return GetVideoTagTypeString(video_tag_body_->GetVideoTagType());
+	return __super::GetSubTypeString();
+}
+
+std::string FlvTagDataVideo::GetFormatString()
+{
+	return "";
+}
+
+std::string FlvTagDataVideo::GetExtraInfo()
+{
+	return "";
+}
+
 VideoTagHeader::VideoTagHeader(ByteReader& data)
 {
 	memset(this, 0, sizeof(VideoTagHeader));
@@ -358,6 +507,21 @@ VideoTagHeader::VideoTagHeader(ByteReader& data)
 	}
 
 	is_good_ = true;
+}
+
+std::string GetVideoTagTypeString(VideoTagType type)
+{
+	switch (type)
+	{
+	case VideoTagTypeAVCSequenceHeader:
+		return "H.264 SPS PPS";
+	case VideoTagTypeAVCNalu:
+		return "H.264 NAL Units";
+	case VideoTagTypeAVCSequenceEnd:
+		return "H.264 Sequence End";
+	default:
+		return UNKNOWN;
+	}
 }
 
 std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCodecID codec_id)

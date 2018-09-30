@@ -54,19 +54,20 @@ FlvFile::~FlvFile()
 
 }
 
-std::shared_ptr<FlvHeaderInterface> FlvFile::GetFlvHeader()
+void FlvFile::Output(const FlvHeaderCallback& header_cb, const FlvTagCallback& tag_cb, const NaluCallback& nalu_cb)
 {
-	return std::shared_ptr<FlvHeaderInterface>(nullptr);
+	if (header_cb)
+		header_cb(flv_header_);
+
+	for (auto iter = flv_data_.cbegin(); iter != flv_data_.cend(); iter++)
+	{
+		std::shared_ptr<FlvTag> tag = *iter;
+		if (!tag || !tag->IsGood())
+			continue;
+		if (tag_cb)
+			tag_cb(*iter);
+	}
 }
 
-std::shared_ptr<FlvTagInterface> FlvFile::EnumFlvTag()
-{
-	return std::shared_ptr<FlvTagInterface>(nullptr);
-}
-
-std::shared_ptr<NaluInterface> FlvFile::EnumNalu()
-{
-	return std::shared_ptr<NaluInterface>(nullptr);
-}
 
 

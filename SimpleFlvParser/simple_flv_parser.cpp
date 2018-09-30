@@ -22,34 +22,22 @@ int main(int argc, char* argv[])
 
 	std::shared_ptr<FlvFile> flv;
 	std::shared_ptr<FlvOutputInterface> output;
-	std::shared_ptr<FlvHeaderInterface> header;
-	std::shared_ptr<FlvTagInterface> tag;
-	std::shared_ptr<NaluInterface> nalu;
+	FlvHeaderCallback header_cb;
+	FlvTagCallback tag_cb;
+	NaluCallback nalu_cb;
 
 	//begin parsing flv file
 	flv = std::make_shared<FlvFile>(flv_file);
 
 	//open an output
 
-	//flv header output
-	header = flv->GetFlvHeader();
-	output->FlvHeaderOutput(header);
+	//get the output callbacks
+	header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
+	tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
+	nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
 
-	//flv tags output
-	do 
-	{
-		tag = flv->EnumFlvTag();
-		if (tag)
-			output->FlvTagOutput(tag);
-	} while (tag);
-	
-	//H.264 NAL units output
-	do 
-	{
-		nalu = flv->EnumNalu();
-		if (nalu)
-			output->NaluOutput(nalu);
-	} while (nalu);
+	//do output
+	flv->Output(header_cb, tag_cb, nalu_cb);
 
 	return 0;
 }

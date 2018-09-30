@@ -13,10 +13,15 @@
 //////////////////////////////////////////////////////////////////////////
 // Flv Header
 
-struct FlvHeader
+struct FlvHeader : public FlvHeaderInterface
 {
 	FlvHeader(ByteReader& data);
 	~FlvHeader() = default;
+
+	//implement FlvHeaderInterface
+	virtual bool HaveVideo() override;
+	virtual bool HaveAudio() override;
+	virtual uint8_t Version() override;
 
 	uint8_t  version_;
 	bool     has_video_;
@@ -36,6 +41,8 @@ enum FlvTagType
 	FlvTagTypeScriptData = 18,
 };
 
+std::string GetFlvTagTypeString(FlvTagType type);
+
 struct FlvTagHeader
 {
 	FlvTagHeader(ByteReader& data);
@@ -54,6 +61,10 @@ public:
 	static std::shared_ptr<FlvTagData> Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type);
 	virtual ~FlvTagData() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual uint32_t GetCts() { return 0; }
+	virtual std::string GetSubTypeString() { return ""; }
+	virtual std::string GetFormatString() { return ""; }
+	virtual std::string GetExtraInfo() { return ""; }
 
 protected:
 	FlvTagData() {}
@@ -62,11 +73,23 @@ protected:
 	bool is_good_ = false;
 };
 
-class FlvTag
+class FlvTag : public FlvTagInterface
 {
 public:
 	FlvTag(ByteReader& data, int tag_serial);
 	bool IsGood() { return is_good_; }
+
+	//implement FlvTagInterface
+	virtual int Serial() override;
+	virtual uint32_t PreviousTagSize() override;
+	virtual std::string TagType() override;
+	virtual uint32_t StreamId() override;
+	virtual uint32_t TagSize() override;
+	virtual uint32_t Pts() override;
+	virtual uint32_t Dts() override;
+	virtual std::string SubType() override;
+	virtual std::string Format() override;
+	virtual std::string ExtraInfo() override;
 
 private:
 	int tag_serial_ = -1;
@@ -142,6 +165,8 @@ enum AudioTagType
 	AudioTagTypeAACData   = 1
 };
 
+std::string GetAudioTagTypeString(AudioTagType type);
+
 struct AudioTagHeader
 {
 	AudioFormat audio_format_;
@@ -159,6 +184,7 @@ public:
 	static std::shared_ptr<AudioTagBody> Create(ByteReader& data, AudioFormat audio_format);
 	virtual ~AudioTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	AudioTagType GetAudioTagType() { return audio_tag_type_; }
 
 protected:
 	AudioTagBody() = default;
@@ -208,6 +234,10 @@ class FlvTagDataAudio : public FlvTagData
 public:
 	FlvTagDataAudio(ByteReader& data);
 
+	virtual std::string GetSubTypeString() override;
+	virtual std::string GetFormatString() override;
+	virtual std::string GetExtraInfo() override;
+
 private:
 	std::shared_ptr<AudioTagHeader> audio_tag_header_;
 	std::shared_ptr<AudioTagBody> audio_tag_body_;
@@ -253,12 +283,16 @@ enum VideoTagType
 	VideoTagTypeAVCSequenceEnd      = 2,  //AVC end of sequence (lower level Nalu sequence ender is not required or supported)
 };
 
+std::string GetVideoTagTypeString(VideoTagType type);
+
 class VideoTagBody
 {
 public:
 	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodecID codec_id);
 	virtual ~VideoTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual uint32_t GetCts() { return 0; }
+	VideoTagType GetVideoTagType() { return video_tag_type_; }
 
 protected:
 	VideoTagBody() = default;
@@ -362,9 +396,10 @@ class VideoTagBodyAVCNalu : public VideoTagBody
 public:
 	VideoTagBodyAVCNalu(ByteReader& data);
 	~VideoTagBodyAVCNalu() {}
+	uint32_t GetCts() { return cts_; }
 
 private:
-	uint32_t cts_;
+	uint32_t cts_ = 0;
 	std::list<std::shared_ptr<NaluBase> > nalu_list_;
 };
 
@@ -390,9 +425,10 @@ class VideoTagBodySpsPps : public VideoTagBody
 public:
 	VideoTagBodySpsPps(ByteReader& data);
 	~VideoTagBodySpsPps() {}
+	uint32_t GetCts() { return cts_; }
 
 private:
-	uint32_t cts_;
+	uint32_t cts_ = 0;
 	std::shared_ptr<AVCDecoderConfigurationRecord> avc_config_;
 };
 
@@ -400,9 +436,10 @@ class VideoTagBodySequenceEnd : public VideoTagBody
 {
 public:
 	VideoTagBodySequenceEnd(ByteReader& data);
+	uint32_t GetCts() { return cts_; }
 
 private:
-	uint32_t cts_;
+	uint32_t cts_ = 0;
 };
 
 class VideoTagBodyNonAVC : public VideoTagBody
@@ -416,6 +453,11 @@ class FlvTagDataVideo : public FlvTagData
 public:
 	FlvTagDataVideo(ByteReader& data);
 	~FlvTagDataVideo() {}
+
+	virtual uint32_t GetCts() override;
+	virtual std::string GetSubTypeString() override;
+	virtual std::string GetFormatString() override;
+	virtual std::string GetExtraInfo() override;
 
 private:
 	std::shared_ptr<VideoTagHeader> video_tag_header_;
