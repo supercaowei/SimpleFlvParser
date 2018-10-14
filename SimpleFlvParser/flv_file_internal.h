@@ -10,6 +10,8 @@
 #include <memory>
 #include <list>
 
+typedef std::list<std::shared_ptr<NaluInterface> > NaluList;
+
 //////////////////////////////////////////////////////////////////////////
 // Flv Header
 
@@ -65,6 +67,7 @@ public:
 	virtual std::string GetSubTypeString() { return ""; }
 	virtual std::string GetFormatString() { return ""; }
 	virtual std::string GetExtraInfo() { return ""; }
+	virtual NaluList EnumNalus() { return NaluList(); }
 
 protected:
 	FlvTagData() {}
@@ -78,6 +81,7 @@ class FlvTag : public FlvTagInterface
 public:
 	FlvTag(ByteReader& data, int tag_serial);
 	bool IsGood() { return is_good_; }
+	NaluList EnumNalus();
 
 	//implement FlvTagInterface
 	virtual int Serial() override;
@@ -293,6 +297,7 @@ public:
 	virtual bool IsGood() { return is_good_; }
 	virtual uint32_t GetCts() { return 0; }
 	VideoTagType GetVideoTagType() { return video_tag_type_; }
+	virtual NaluList EnumNalus() { return NaluList(); }
 
 protected:
 	VideoTagBody() = default;
@@ -302,7 +307,7 @@ protected:
 	VideoTagType video_tag_type_;
 };
 
-enum NaluType
+enum EnNaluType
 {
 	NaluTypeUnknown    = -1,
 	NaluTypeUnused     = 0,
@@ -322,15 +327,17 @@ enum NaluType
 	NaluTypeSliceAux   = 19,
 };
 
+std::string GetNaluTypeString(EnNaluType type);
+
 struct NaluHeader
 {
 	uint8_t nal_ref_idc_;
-	NaluType nal_unit_type_;
+	EnNaluType nal_unit_type_;
 
 	NaluHeader(uint8_t b);
 };
 
-class NaluBase
+class NaluBase : public NaluInterface
 {
 public:
 	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint8_t nalu_len_size);
@@ -340,9 +347,15 @@ public:
 	bool IsNoBother() { return no_bother; }
 	void ReleaseRbsp();
 
+	virtual uint8_t Importance() override;
+	virtual std::string NaluType() override;
+	virtual uint32_t NaluSize() override;
+	virtual std::string SliceType() override;
+	virtual std::string ExtraInfo() override;
+
 private:
 	//don't change ByteReader position, get the nalu type
-	static NaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
+	static EnNaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
 
 public:
 	static std::shared_ptr<NaluBase> CurrentSps;
@@ -362,6 +375,8 @@ class NaluSps : public NaluBase
 public:
 	NaluSps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<sps_t> sps_;
+
+	virtual std::string ExtraInfo() override;
 };
 
 class NaluPps : public NaluBase
@@ -369,12 +384,17 @@ class NaluPps : public NaluBase
 public:
 	NaluPps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<pps_t> pps_;
+
+	virtual std::string ExtraInfo() override;
 };
 
 class NaluSlice : public NaluBase
 {
 public:
 	NaluSlice(ByteReader& data, uint8_t nalu_len_size);
+
+	virtual std::string SliceType() override;
+	virtual std::string ExtraInfo() override;
 
 private:
 	std::shared_ptr<slice_header_t> slice_header_;
@@ -385,6 +405,8 @@ class NaluSEI : public NaluBase
 public:
 	NaluSEI(ByteReader& data, uint8_t nalu_len_size);
 	~NaluSEI();
+
+	virtual std::string ExtraInfo() override;
 
 private:
 	sei_t** seis_ = NULL;
@@ -397,6 +419,7 @@ public:
 	VideoTagBodyAVCNalu(ByteReader& data);
 	~VideoTagBodyAVCNalu() {}
 	uint32_t GetCts() { return cts_; }
+	virtual NaluList EnumNalus() override;
 
 private:
 	uint32_t cts_ = 0;
@@ -426,6 +449,8 @@ public:
 	VideoTagBodySpsPps(ByteReader& data);
 	~VideoTagBodySpsPps() {}
 	uint32_t GetCts() { return cts_; }
+
+	virtual NaluList EnumNalus() override;
 
 private:
 	uint32_t cts_ = 0;
@@ -458,6 +483,7 @@ public:
 	virtual std::string GetSubTypeString() override;
 	virtual std::string GetFormatString() override;
 	virtual std::string GetExtraInfo() override;
+	virtual NaluList EnumNalus() override;
 
 private:
 	std::shared_ptr<VideoTagHeader> video_tag_header_;
