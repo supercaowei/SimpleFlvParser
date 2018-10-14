@@ -29,7 +29,7 @@ FlvFile::FlvFile(const std::string& flv_path)
 
 	ByteReader reader(flv_data, file_size);
 	flv_header_ = std::make_shared<FlvHeader>(reader);
-	if (!flv_header_ || !flv_header_->is_good_)
+	if (!flv_header_ || !flv_header_->IsGood())
 	{
 		delete[] flv_data;
 		return;

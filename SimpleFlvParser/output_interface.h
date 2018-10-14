@@ -10,7 +10,7 @@ class NaluInterface;
 class FlvOutputInterface
 {
 public:
-	virtual ~FlvOutputInterface() = 0 {}
+	virtual ~FlvOutputInterface() {}
 	virtual void FlvHeaderOutput(const std::shared_ptr<FlvHeaderInterface>& header) = 0;
 	virtual void FlvTagOutput(const std::shared_ptr<FlvTagInterface>& tag) = 0;
 	virtual void NaluOutput(const std::shared_ptr<NaluInterface>& nalu) = 0;

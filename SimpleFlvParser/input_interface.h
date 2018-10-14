@@ -7,7 +7,7 @@
 class FlvHeaderInterface
 {
 public:
-	virtual ~FlvHeaderInterface() = 0 {}
+	virtual ~FlvHeaderInterface() {}
 	virtual bool HaveVideo() = 0;
 	virtual bool HaveAudio() = 0;
 	virtual uint8_t Version() = 0;
@@ -16,7 +16,7 @@ public:
 class FlvTagInterface
 {
 public:
-	virtual ~FlvTagInterface() = 0 {}
+	virtual ~FlvTagInterface() {}
 	virtual int Serial() = 0;
 	virtual uint32_t PreviousTagSize() = 0;
 	virtual std::string TagType() = 0;
@@ -32,7 +32,7 @@ public:
 class NaluInterface
 {
 public:
-	virtual ~NaluInterface() = 0 {}
+	virtual ~NaluInterface() {}
 	virtual uint8_t Importance() = 0;
 	virtual std::string NaluType() = 0;
 	virtual uint32_t NaluSize() = 0;

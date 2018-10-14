@@ -10,8 +10,6 @@
 
 FlvHeader::FlvHeader(ByteReader& data)
 {
-	memset(this, 0, sizeof(FlvHeader));
-
 	if (data.RemainingSize() < FLV_HEADER_SIZE)
 		return;
 
@@ -294,7 +292,7 @@ std::string FlvTagDataAudio::GetSubTypeString()
 {
 	if (audio_tag_body_)
 		return GetAudioTagTypeString(audio_tag_body_->GetAudioTagType());
-	return __super::GetSubTypeString();
+	return FlvTagData::GetSubTypeString();
 }
 
 std::string FlvTagDataAudio::GetFormatString()
@@ -462,14 +460,14 @@ uint32_t FlvTagDataVideo::GetCts()
 {
 	if (video_tag_body_)
 		return video_tag_body_->GetCts();
-	return __super::GetCts();
+	return FlvTagData::GetCts();
 }
 
 std::string FlvTagDataVideo::GetSubTypeString()
 {
 	if (video_tag_body_)
 		return GetVideoTagTypeString(video_tag_body_->GetVideoTagType());
-	return __super::GetSubTypeString();
+	return FlvTagData::GetSubTypeString();
 }
 
 std::string FlvTagDataVideo::GetFormatString()

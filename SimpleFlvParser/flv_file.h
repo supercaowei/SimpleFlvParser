@@ -12,7 +12,7 @@ typedef std::function<void(const std::shared_ptr<FlvHeaderInterface>&)> FlvHeade
 typedef std::function<void(const std::shared_ptr<FlvTagInterface>&)> FlvTagCallback;
 typedef std::function<void(const std::shared_ptr<NaluInterface>&)> NaluCallback;
 
-struct FlvHeader;
+class FlvHeader;
 class FlvTag;
 
 class FlvFile
