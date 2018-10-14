@@ -6,6 +6,7 @@
 #define FLV_TAG_HEADER_SIZE       11
 #define FLV_VIDEO_TAG_HEADER_SIZE 5
 #define FLV_AUDIO_TAG_HEADER_SIZE 1
+#define STRING_UNKNOWN "Unknown"
 
 FlvHeader::FlvHeader(ByteReader& data)
 {
@@ -30,6 +31,36 @@ FlvHeader::FlvHeader(ByteReader& data)
 
 	if (header_size_ > FLV_HEADER_SIZE)
 		data.ReadBytes(header_size_ - FLV_HEADER_SIZE);
+}
+
+bool FlvHeader::HaveVideo()
+{
+	return has_video_;
+}
+
+bool FlvHeader::HaveAudio()
+{
+	return has_audio_;
+}
+
+uint8_t FlvHeader::Version()
+{
+	return version_;
+}
+
+std::string GetFlvTagTypeString(FlvTagType type)
+{
+	switch (type)
+	{
+	case FlvTagTypeAudio:
+		return "AudioTag";
+	case FlvTagTypeVideo:
+		return "VideoTag";
+	case FlvTagTypeScriptData:
+		return "Script";
+	default:
+		return "UnknownTagType";
+	}
 }
 
 FlvTagHeader::FlvTagHeader(ByteReader& data)
@@ -88,6 +119,79 @@ FlvTag::FlvTag(ByteReader& data, int tag_serial)
 	is_good_ = true;
 }
 
+NaluList FlvTag::EnumNalus()
+{
+	if (tag_data_)
+		return tag_data_->EnumNalus();
+	return NaluList();
+}
+
+int FlvTag::Serial()
+{
+	return tag_serial_;
+}
+
+uint32_t FlvTag::PreviousTagSize()
+{
+	return previous_tag_size_;
+}
+
+std::string FlvTag::TagType()
+{
+	if (tag_header_)
+		return GetFlvTagTypeString(tag_header_->tag_type_);
+	return "";
+}
+
+uint32_t FlvTag::StreamId()
+{
+	if (tag_header_)
+		return tag_header_->stream_id_;
+	return 0;
+}
+
+uint32_t FlvTag::TagSize()
+{
+	if (tag_header_)
+		return FLV_TAG_HEADER_SIZE + tag_header_->tag_data_size_;
+	return 0;
+}
+
+uint32_t FlvTag::Pts()
+{
+	if (tag_header_ && tag_data_)
+		return tag_header_->timestamp_ + tag_data_->GetCts();
+	return 0;
+}
+
+uint32_t FlvTag::Dts()
+{
+	if (tag_header_)
+		return tag_header_->timestamp_;
+	return 0;
+}
+
+std::string FlvTag::SubType()
+{
+	if (tag_data_)
+		return tag_data_->GetSubTypeString();
+	return "";
+}
+
+std::string FlvTag::Format()
+{
+	if (tag_data_)
+		return tag_data_->GetFormatString();
+	return "";
+}
+
+std::string FlvTag::ExtraInfo()
+{
+	if (tag_data_)
+		return tag_data_->GetExtraInfo();
+	return "";
+}
+
 std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type)
 {
 	if (data.RemainingSize() < tag_data_size)
@@ -125,8 +229,6 @@ FlvTagDataScript::FlvTagDataScript(ByteReader& data)
 	DecodeAMF(&amf, script_data_);
 	if (script_data_.isNull() || (!script_data_.isObject() && !script_data_.isArray()))
 		return;
-
-	printf("%s\n", script_data_.toStyledString().c_str());
 
 	is_good_ = true;
 }
@@ -186,6 +288,25 @@ FlvTagDataAudio::FlvTagDataAudio(ByteReader& data)
 		return;
 
 	is_good_ = true;
+}
+
+std::string FlvTagDataAudio::GetSubTypeString()
+{
+	if (audio_tag_body_)
+		return GetAudioTagTypeString(audio_tag_body_->GetAudioTagType());
+	return __super::GetSubTypeString();
+}
+
+std::string FlvTagDataAudio::GetFormatString()
+{
+	//TODO
+	return "";
+}
+
+std::string FlvTagDataAudio::GetExtraInfo()
+{
+	//TODO
+	return "";
 }
 
 AudioTagHeader::AudioTagHeader(ByteReader& data)
@@ -251,6 +372,19 @@ AudioTagHeader::AudioTagHeader(ByteReader& data)
 	}
 
 	is_good_ = true;
+}
+
+std::string GetAudioTagTypeString(AudioTagType type)
+{
+	switch (type)
+	{
+	case AudioTagTypeAACConfig:
+		return "AAC Config Frame";
+	case AudioTagTypeAACData:
+		return "AAC Data Frame";
+	default:
+		return STRING_UNKNOWN;
+	}
 }
 
 std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat audio_format)
@@ -324,6 +458,39 @@ FlvTagDataVideo::FlvTagDataVideo(ByteReader& data)
 	is_good_ = true;
 }
 
+uint32_t FlvTagDataVideo::GetCts()
+{
+	if (video_tag_body_)
+		return video_tag_body_->GetCts();
+	return __super::GetCts();
+}
+
+std::string FlvTagDataVideo::GetSubTypeString()
+{
+	if (video_tag_body_)
+		return GetVideoTagTypeString(video_tag_body_->GetVideoTagType());
+	return __super::GetSubTypeString();
+}
+
+std::string FlvTagDataVideo::GetFormatString()
+{
+	//TODO
+	return "";
+}
+
+std::string FlvTagDataVideo::GetExtraInfo()
+{
+	//TODO
+	return "";
+}
+
+NaluList FlvTagDataVideo::EnumNalus()
+{
+	if (video_tag_body_)
+		return video_tag_body_->EnumNalus();
+	return NaluList();
+}
+
 VideoTagHeader::VideoTagHeader(ByteReader& data)
 {
 	memset(this, 0, sizeof(VideoTagHeader));
@@ -342,7 +509,7 @@ VideoTagHeader::VideoTagHeader(ByteReader& data)
 		return;
 	}
 
-	codec_id_ = (FlvVideoCodeID)(b & 0x0f); //low 4 bits
+	codec_id_ = (FlvVideoCodecID)(b & 0x0f); //low 4 bits
 	switch (codec_id_)
 	{
 	case FlvVideoCodeIDJPEG:
@@ -360,7 +527,22 @@ VideoTagHeader::VideoTagHeader(ByteReader& data)
 	is_good_ = true;
 }
 
-std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCodeID codec_id)
+std::string GetVideoTagTypeString(VideoTagType type)
+{
+	switch (type)
+	{
+	case VideoTagTypeAVCSequenceHeader:
+		return "H.264 SPS PPS";
+	case VideoTagTypeAVCNalu:
+		return "H.264 NAL Units";
+	case VideoTagTypeAVCSequenceEnd:
+		return "H.264 Sequence End";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCodecID codec_id)
 {
 	switch (codec_id)
 	{
@@ -370,9 +552,9 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 		switch (b)
 		{
 		case VideoTagTypeAVCSequenceHeader:
-			return std::make_shared<VideoTagBodySPSPPS>(data);
-		case VideoTagTypeAVCNALU:
-			return std::make_shared<VideoTagBodyAVCNALU>(data);
+			return std::make_shared<VideoTagBodySpsPps>(data);
+		case VideoTagTypeAVCNalu:
+			return std::make_shared<VideoTagBodyAVCNalu>(data);
 		case VideoTagTypeAVCSequenceEnd:
 			return std::make_shared<VideoTagBodySequenceEnd>(data);
 		default:
@@ -385,37 +567,76 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 	}
 }
 
-NALUHeader::NALUHeader(uint8_t b)
+std::string GetNaluTypeString(EnNaluType type)
 {
-	nal_unit_type_ = (NALUType)(b & 0x1f);
-	nal_ref_idc_ = (b >> 5) & 0x03;
-}
-
-std::shared_ptr<NALUBase> NALUBase::CurrentSPS = std::shared_ptr<NALUBase>(nullptr);
-std::shared_ptr<NALUBase> NALUBase::CurrentPPS = std::shared_ptr<NALUBase>(nullptr);
-std::shared_ptr<NALUBase> NALUBase::Create(ByteReader& data, uint8_t nalu_len_size)
-{
-	NALUType nalu_type = GetNALUType(data, nalu_len_size);
-	switch (nalu_type)
+	switch (type)
 	{
-	case NALUTypeNonIDR:
-	case NALUTypeIDR:
-	case NALUTypeSliceAux:
-		return std::make_shared<NALUSlice>(data, nalu_len_size);
-	case NALUTypeSEI:
-		return std::make_shared<NALUSEI>(data, nalu_len_size);
-	case NALUTypeSPS:
-		CurrentSPS = std::make_shared<NALUSPS>(data, nalu_len_size);
-		return CurrentSPS;
-	case NALUTypePPS:
-		CurrentPPS = std::make_shared<NALUPPS>(data, nalu_len_size);
-		return CurrentPPS;
+	case NaluTypeUnused:
+		return "Unused";
+	case NaluTypeNonIDR:
+		return "Non-IDR Slice";
+	case NaluTypeSliceDPA:
+		return "Data Partition A";
+	case NaluTypeSliceDPB:
+		return "Data Partition B";
+	case NaluTypeSliceDPC:
+		return "Data Partition C";
+	case NaluTypeIDR:
+		return "IDR Slice";
+	case NaluTypeSEI:
+		return "SEI";
+	case NaluTypeSPS:
+		return "SPS";
+	case NaluTypePPS:
+		return "PPS";
+	case NaluTypeAUD:
+		return "Access Unit Delimiter";
+	case NaluTypeSeqEnd:
+		return "End of Sequence";
+	case NaluTypeStreamEnd:
+		return "End of Stream";
+	case NaluTypeFillerData:
+		return "Filler Data";
+	case NaluTypeSPSExt:
+		return "SPS Ext";
+	case NaluTypeSliceAux:
+		return "Aux Slice";
 	default:
-		return std::make_shared<NALUBase>(data, nalu_len_size);
+		return STRING_UNKNOWN;
 	}
 }
 
-NALUBase::NALUBase(ByteReader& data, uint8_t nalu_len_size)
+NaluHeader::NaluHeader(uint8_t b)
+{
+	nal_unit_type_ = (EnNaluType)(b & 0x1f);
+	nal_ref_idc_ = (b >> 5) & 0x03;
+}
+
+std::shared_ptr<NaluBase> NaluBase::CurrentSps = std::shared_ptr<NaluBase>(nullptr);
+std::shared_ptr<NaluBase> NaluBase::CurrentPps = std::shared_ptr<NaluBase>(nullptr);
+std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_size)
+{
+	EnNaluType nalu_type = GetNaluType(data, nalu_len_size);
+	switch (nalu_type)
+	{
+	case NaluTypeNonIDR:
+	case NaluTypeIDR:
+	case NaluTypeSliceAux:
+		return std::make_shared<NaluSlice>(data, nalu_len_size);
+	case NaluTypeSEI:
+		return std::make_shared<NaluSEI>(data, nalu_len_size);
+	case NaluTypeSPS:
+		CurrentSps = std::make_shared<NaluSps>(data, nalu_len_size);
+		return CurrentSps;
+	case NaluTypePPS:
+		CurrentPps = std::make_shared<NaluPps>(data, nalu_len_size);
+		return CurrentPps;
+	default:
+		return std::make_shared<NaluBase>(data, nalu_len_size);
+	}
+}
+
+NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size)
 {
 	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
 	// In sps and pps, it's 2. In IDR, p, b frames and SEI nalu, it's 4.
@@ -430,8 +651,8 @@ NALUBase::NALUBase(ByteReader& data, uint8_t nalu_len_size)
 		return;
 	}
 
-	//parse NALU header
-	nalu_header_ = std::make_shared<NALUHeader>(*data.ReadBytes(1, false)); //just peek
+	//parse nalu header
+	nalu_header_ = std::make_shared<NaluHeader>(*data.ReadBytes(1, false)); //just peek
 
 	//allocate memory and transfer nal to rbsp
 	rbsp_size_ = nalu_size_;
@@ -449,24 +670,24 @@ NALUBase::NALUBase(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
-NALUBase::~NALUBase()
+NaluBase::~NaluBase()
 {
 	ReleaseRbsp();
 }
 
-NALUType NALUBase::GetNALUType(const ByteReader& data, uint8_t nalu_len_size)
+EnNaluType NaluBase::GetNaluType(const ByteReader& data, uint8_t nalu_len_size)
 {
 	if (nalu_len_size > 4)
-		return NALUTypeUnknown;
+		return NaluTypeUnknown;
 	//The first nalu_len_size bytes of nalu_start are nalu length, The nalu header is after the nalu length
 	if (data.RemainingSize() < (uint32_t)(nalu_len_size + 1))
-		return NALUTypeUnknown;
+		return NaluTypeUnknown;
 	
 	uint8_t nalu_header = *(data.CurrentPos() + nalu_len_size);
-	return (NALUType)(nalu_header & 0x1f);
+	return (EnNaluType)(nalu_header & 0x1f);
 }
 
-void NALUBase::ReleaseRbsp()
+void NaluBase::ReleaseRbsp()
 {
 	if (rbsp_)
 	{
@@ -476,13 +697,42 @@ void NALUBase::ReleaseRbsp()
 	}
 }
 
-NALUSPS::NALUSPS(ByteReader& data, uint8_t nalu_len_size)
-	: NALUBase(data, nalu_len_size)
+uint8_t NaluBase::Importance()
 {
-	if (!is_good_) //NALUBase parse error
+	if (nalu_header_)
+		return nalu_header_->nal_ref_idc_;
+	return 0;
+}
+
+std::string NaluBase::NaluType()
+{
+	if (nalu_header_)
+		return GetNaluTypeString(nalu_header_->nal_unit_type_);
+	return "";
+}
+
+uint32_t NaluBase::NaluSize()
+{
+	return nalu_size_;
+}
+
+std::string NaluBase::SliceType()
+{
+	return "";
+}
+
+std::string NaluBase::ExtraInfo()
+{
+	return "";
+}
+
+NaluSps::NaluSps(ByteReader& data, uint8_t nalu_len_size)
+	: NaluBase(data, nalu_len_size)
+{
+	if (!is_good_) //NaluBase parse error
 		return;
 	is_good_ = false;
-	if (nalu_header_->nal_unit_type_ != NALUTypeSPS)
+	if (nalu_header_->nal_unit_type_ != NaluTypeSPS)
 		return;
 
 	sps_ = std::make_shared<sps_t>();
@@ -493,13 +743,19 @@ NALUSPS::NALUSPS(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
-NALUPPS::NALUPPS(ByteReader& data, uint8_t nalu_len_size)
-	: NALUBase(data, nalu_len_size)
+std::string NaluSps::ExtraInfo()
 {
-	if (!is_good_) //NALUBase parse error
+	//TODO
+	return "";
+}
+
+NaluPps::NaluPps(ByteReader& data, uint8_t nalu_len_size)
+	: NaluBase(data, nalu_len_size)
+{
+	if (!is_good_) //NaluBase parse error
 		return;
 	is_good_ = false;
-	if (nalu_header_->nal_unit_type_ != NALUTypePPS)
+	if (nalu_header_->nal_unit_type_ != NaluTypePPS)
 		return;
 
 	pps_ = std::make_shared<pps_t>();
@@ -510,22 +766,28 @@ NALUPPS::NALUPPS(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
-NALUSlice::NALUSlice(ByteReader& data, uint8_t nalu_len_size)
-	: NALUBase(data, nalu_len_size)
+std::string NaluPps::ExtraInfo()
 {
-	if (!is_good_) //NALUBase parse error
+	//TODO
+	return "";
+}
+
+NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size)
+	: NaluBase(data, nalu_len_size)
+{
+	if (!is_good_) //NaluBase parse error
 		return;
 	is_good_ = false;
-	if (nalu_header_->nal_unit_type_ != NALUTypeNonIDR 
-		&& nalu_header_->nal_unit_type_ != NALUTypeIDR
-		&& nalu_header_->nal_unit_type_ != NALUTypeSliceAux)
+	if (nalu_header_->nal_unit_type_ != NaluTypeNonIDR 
+		&& nalu_header_->nal_unit_type_ != NaluTypeIDR
+		&& nalu_header_->nal_unit_type_ != NaluTypeSliceAux)
 		return;
 
 	slice_header_ = std::make_shared<slice_header_t>();
 	memset(slice_header_.get(), 0, sizeof(slice_header_t));
 	BitReader rbsp_data(rbsp_, rbsp_size_);
-	NALUSPS* current_sps = (NALUSPS*)NALUBase::CurrentSPS.get();
-	NALUPPS* current_pps = (NALUPPS*)NALUBase::CurrentPPS.get();
+	NaluSps* current_sps = (NaluSps*)NaluBase::CurrentSps.get();
+	NaluPps* current_pps = (NaluPps*)NaluBase::CurrentPps.get();
 	if (!current_sps || !current_pps)
 		return;
 	read_slice_header_rbsp(slice_header_.get(), rbsp_data, nalu_header_->nal_unit_type_, nalu_header_->nal_ref_idc_, current_sps->sps_.get(), current_pps->pps_.get());
@@ -533,13 +795,25 @@ NALUSlice::NALUSlice(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
-NALUSEI::NALUSEI(ByteReader& data, uint8_t nalu_len_size)
-	: NALUBase(data, nalu_len_size)
+std::string NaluSlice::SliceType()
 {
-	if (!is_good_) //NALUBase parse error
+	//TODO
+	return "";
+}
+
+std::string NaluSlice::ExtraInfo()
+{
+	//TODO
+	return "";
+}
+
+NaluSEI::NaluSEI(ByteReader& data, uint8_t nalu_len_size)
+	: NaluBase(data, nalu_len_size)
+{
+	if (!is_good_) //NaluBase parse error
 		return;
 	is_good_ = false;
-	if (nalu_header_->nal_unit_type_ != NALUTypeSEI)
+	if (nalu_header_->nal_unit_type_ != NaluTypeSEI)
 		return;
 
 	BitReader rbsp_data(rbsp_, rbsp_size_);
@@ -550,7 +824,7 @@ NALUSEI::NALUSEI(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
-NALUSEI::~NALUSEI()
+NaluSEI::~NaluSEI()
 {
 	if (seis_ || sei_num_)
 	{
@@ -560,7 +834,13 @@ NALUSEI::~NALUSEI()
 	}
 }
 
-VideoTagBodyAVCNALU::VideoTagBodyAVCNALU(ByteReader& data)
+std::string NaluSEI::ExtraInfo()
+{
+	//TODO
+	return "";
+}
+
+VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)
 {
 	if (data.RemainingSize() < 3)
 		return;
@@ -568,7 +848,7 @@ VideoTagBodyAVCNALU::VideoTagBodyAVCNALU(ByteReader& data)
 
 	while (data.RemainingSize())
 	{
-		std::shared_ptr<NALUBase> nalu = NALUBase::Create(data, 4);
+		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, 4);
 		if (!nalu || !nalu->IsNoBother())
 			break;
 		else if (!nalu->IsGood())
@@ -578,8 +858,14 @@ VideoTagBodyAVCNALU::VideoTagBodyAVCNALU(ByteReader& data)
 	if (nalu_list_.empty())
 		return;
 
-	video_tag_type_ = VideoTagTypeAVCNALU;
+	video_tag_type_ = VideoTagTypeAVCNalu;
 	is_good_ = true;
+}
+
+NaluList VideoTagBodyAVCNalu::EnumNalus()
+{
+	NaluList list(nalu_list_.begin(), nalu_list_.end());
+	return list;
 }
 
 AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
@@ -598,7 +884,7 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
 	numOfSequenceParameterSets = *data.ReadBytes(1);
 	if ((numOfSequenceParameterSets & 0x1F) != 1) //Only 1 sps, says Adobe
 		return;
-	sps_nal_ = NALUBase::Create(data, 2);
+	sps_nal_ = NaluBase::Create(data, 2);
 	if (!sps_nal_ || !sps_nal_->IsGood())
 		return;
 
@@ -608,14 +894,14 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
 	numOfPictureParameterSets = *data.ReadBytes(1);
 	if (numOfPictureParameterSets != 1) //Only 1 pps, says Adobe
 		return;
-	pps_nal_ = NALUBase::Create(data, 2);
+	pps_nal_ = NaluBase::Create(data, 2);
 	if (!pps_nal_ || !pps_nal_->IsGood())
 		return;
 
 	is_good_ = true;
 }
 
-VideoTagBodySPSPPS::VideoTagBodySPSPPS(ByteReader& data)
+VideoTagBodySpsPps::VideoTagBodySpsPps(ByteReader& data)
 {
 	if (data.RemainingSize() < 3)
 		return;
@@ -626,6 +912,19 @@ VideoTagBodySPSPPS::VideoTagBodySPSPPS(ByteReader& data)
 
 	video_tag_type_ = VideoTagTypeAVCSequenceHeader;
 	is_good_ = true;
+}
+
+NaluList VideoTagBodySpsPps::EnumNalus()
+{
+	NaluList list;
+	if (avc_config_)
+	{
+		if (avc_config_->sps_nal_)
+			list.push_back(avc_config_->sps_nal_);
+		if (avc_config_->pps_nal_)
+			list.push_back(avc_config_->pps_nal_);
+	}
+	return list;
 }
 
 VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)

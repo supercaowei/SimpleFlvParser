@@ -54,3 +54,26 @@ FlvFile::~FlvFile()
 
 }
 
+void FlvFile::Output(const FlvHeaderCallback& header_cb, const FlvTagCallback& tag_cb, const NaluCallback& nalu_cb)
+{
+	if (header_cb)
+		header_cb(flv_header_);
+
+	for (auto iter = flv_data_.cbegin(); iter != flv_data_.cend(); iter++)
+	{
+		std::shared_ptr<FlvTag> tag = *iter;
+		if (!tag || !tag->IsGood())
+			continue;
+		if (tag_cb)
+			tag_cb(tag);
+		if (nalu_cb)
+		{
+			NaluList nalu_list = tag->EnumNalus();
+			for (const auto& nalu : nalu_list)
+				nalu_cb(nalu);
+		}
+	}
+}
+
+
+

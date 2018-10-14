@@ -1,9 +1,16 @@
 #ifndef _SFP_FLV_FILE_H_
 #define _SFP_FLV_FILE_H_
 
+#include "input_interface.h"
+
 #include <memory>
 #include <string>
 #include <list>
+#include <functional>
+
+typedef std::function<void(const std::shared_ptr<FlvHeaderInterface>&)> FlvHeaderCallback;
+typedef std::function<void(const std::shared_ptr<FlvTagInterface>&)> FlvTagCallback;
+typedef std::function<void(const std::shared_ptr<NaluInterface>&)> NaluCallback;
 
 struct FlvHeader;
 class FlvTag;
@@ -15,8 +22,8 @@ public:
 	~FlvFile();
 	bool IsGood() { return is_good_; }
 
-private:
-
+public:
+	void Output(const FlvHeaderCallback& header_cb, const FlvTagCallback& tag_cb, const NaluCallback& nalu_cb);
 
 private:
 	bool is_good_ = false;
