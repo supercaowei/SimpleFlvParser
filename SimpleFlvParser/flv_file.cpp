@@ -65,7 +65,13 @@ void FlvFile::Output(const FlvHeaderCallback& header_cb, const FlvTagCallback& t
 		if (!tag || !tag->IsGood())
 			continue;
 		if (tag_cb)
-			tag_cb(*iter);
+			tag_cb(tag);
+		if (nalu_cb)
+		{
+			NaluList nalu_list = tag->EnumNalus();
+			for (const auto& nalu : nalu_list)
+				nalu_cb(nalu);
+		}
 	}
 }
 
