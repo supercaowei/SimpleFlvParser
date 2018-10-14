@@ -1,6 +1,7 @@
 #ifndef _SFP_FLV_FILE_INTERNAL_H_
 #define _SFP_FLV_FILE_INTERNAL_H_
 
+#include "input_interface.h"
 #include "bytes.h"
 #include "amf.h"
 #include "utils.h"
@@ -9,13 +10,20 @@
 #include <memory>
 #include <list>
 
+typedef std::list<std::shared_ptr<NaluInterface> > NaluList;
+
 //////////////////////////////////////////////////////////////////////////
 // Flv Header
 
-struct FlvHeader
+struct FlvHeader : public FlvHeaderInterface
 {
 	FlvHeader(ByteReader& data);
 	~FlvHeader() = default;
+
+	//implement FlvHeaderInterface
+	virtual bool HaveVideo() override;
+	virtual bool HaveAudio() override;
+	virtual uint8_t Version() override;
 
 	uint8_t  version_;
 	bool     has_video_;
@@ -35,6 +43,8 @@ enum FlvTagType
 	FlvTagTypeScriptData = 18,
 };
 
+std::string GetFlvTagTypeString(FlvTagType type);
+
 struct FlvTagHeader
 {
 	FlvTagHeader(ByteReader& data);
@@ -53,6 +63,11 @@ public:
 	static std::shared_ptr<FlvTagData> Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type);
 	virtual ~FlvTagData() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual uint32_t GetCts() { return 0; }
+	virtual std::string GetSubTypeString() { return ""; }
+	virtual std::string GetFormatString() { return ""; }
+	virtual std::string GetExtraInfo() { return ""; }
+	virtual NaluList EnumNalus() { return NaluList(); }
 
 protected:
 	FlvTagData() {}
@@ -61,11 +76,24 @@ protected:
 	bool is_good_ = false;
 };
 
-class FlvTag
+class FlvTag : public FlvTagInterface
 {
 public:
 	FlvTag(ByteReader& data, int tag_serial);
 	bool IsGood() { return is_good_; }
+	NaluList EnumNalus();
+
+	//implement FlvTagInterface
+	virtual int Serial() override;
+	virtual uint32_t PreviousTagSize() override;
+	virtual std::string TagType() override;
+	virtual uint32_t StreamId() override;
+	virtual uint32_t TagSize() override;
+	virtual uint32_t Pts() override;
+	virtual uint32_t Dts() override;
+	virtual std::string SubType() override;
+	virtual std::string Format() override;
+	virtual std::string ExtraInfo() override;
 
 private:
 	int tag_serial_ = -1;
@@ -141,6 +169,8 @@ enum AudioTagType
 	AudioTagTypeAACData   = 1
 };
 
+std::string GetAudioTagTypeString(AudioTagType type);
+
 struct AudioTagHeader
 {
 	AudioFormat audio_format_;
@@ -158,6 +188,7 @@ public:
 	static std::shared_ptr<AudioTagBody> Create(ByteReader& data, AudioFormat audio_format);
 	virtual ~AudioTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	AudioTagType GetAudioTagType() { return audio_tag_type_; }
 
 protected:
 	AudioTagBody() = default;
@@ -207,6 +238,10 @@ class FlvTagDataAudio : public FlvTagData
 public:
 	FlvTagDataAudio(ByteReader& data);
 
+	virtual std::string GetSubTypeString() override;
+	virtual std::string GetFormatString() override;
+	virtual std::string GetExtraInfo() override;
+
 private:
 	std::shared_ptr<AudioTagHeader> audio_tag_header_;
 	std::shared_ptr<AudioTagBody> audio_tag_body_;
@@ -224,7 +259,7 @@ enum FlvVideoFrameType
 	FlvVideoFrameTypeVideoInfo             = 5, //video info/command frame
 };
 
-enum FlvVideoCodeID
+enum FlvVideoCodecID
 {
 	FlvVideoCodeIDJPEG              = 1, //JPEG (currently unused)
 	FlvVideoCodeIDSorensonH263      = 2, //Sorenson H.263
@@ -238,7 +273,7 @@ enum FlvVideoCodeID
 struct VideoTagHeader
 {
 	FlvVideoFrameType frame_type_;
-	FlvVideoCodeID codec_id_;
+	FlvVideoCodecID codec_id_;
 	bool is_good_;
 
 	VideoTagHeader(ByteReader& data);
@@ -248,16 +283,21 @@ enum VideoTagType
 {
 	VideoTagTypeNonAVC              = -1, //Non AVC
 	VideoTagTypeAVCSequenceHeader   = 0,  //AVC sequence header
-	VideoTagTypeAVCNALU             = 1,  //AVC NALU
-	VideoTagTypeAVCSequenceEnd      = 2,  //AVC end of sequence (lower level NALU sequence ender is not required or supported)
+	VideoTagTypeAVCNalu             = 1,  //AVC Nalu
+	VideoTagTypeAVCSequenceEnd      = 2,  //AVC end of sequence (lower level Nalu sequence ender is not required or supported)
 };
+
+std::string GetVideoTagTypeString(VideoTagType type);
 
 class VideoTagBody
 {
 public:
-	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodeID codec_id);
+	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodecID codec_id);
 	virtual ~VideoTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual uint32_t GetCts() { return 0; }
+	VideoTagType GetVideoTagType() { return video_tag_type_; }
+	virtual NaluList EnumNalus() { return NaluList(); }
 
 protected:
 	VideoTagBody() = default;
@@ -267,104 +307,123 @@ protected:
 	VideoTagType video_tag_type_;
 };
 
-enum NALUType
+enum EnNaluType
 {
-	NALUTypeUnknown    = -1,
-	NALUTypeUnused     = 0,
-	NALUTypeNonIDR     = 1,
-	NALUTypeSliceDPA   = 2,
-	NALUTypeSliceDPB   = 3,
-	NALUTypeSliceDPC   = 4,
-	NALUTypeIDR        = 5,
-	NALUTypeSEI        = 6,
-	NALUTypeSPS        = 7,
-	NALUTypePPS        = 8,
-	NALUTypeAUD        = 9,
-	NALUTypeSeqEnd     = 10,
-	NALUTypeStreamEnd  = 11,
-	NALUTypeFillerData = 12,
-	NALUTypeSPSExt     = 13,
-	NALUTypeSliceAux   = 19,
+	NaluTypeUnknown    = -1,
+	NaluTypeUnused     = 0,
+	NaluTypeNonIDR     = 1,
+	NaluTypeSliceDPA   = 2,
+	NaluTypeSliceDPB   = 3,
+	NaluTypeSliceDPC   = 4,
+	NaluTypeIDR        = 5,
+	NaluTypeSEI        = 6,
+	NaluTypeSPS        = 7,
+	NaluTypePPS        = 8,
+	NaluTypeAUD        = 9,
+	NaluTypeSeqEnd     = 10,
+	NaluTypeStreamEnd  = 11,
+	NaluTypeFillerData = 12,
+	NaluTypeSPSExt     = 13,
+	NaluTypeSliceAux   = 19,
 };
 
-struct NALUHeader
+std::string GetNaluTypeString(EnNaluType type);
+
+struct NaluHeader
 {
 	uint8_t nal_ref_idc_;
-	NALUType nal_unit_type_;
+	EnNaluType nal_unit_type_;
 
-	NALUHeader(uint8_t b);
+	NaluHeader(uint8_t b);
 };
 
-class NALUBase
+class NaluBase : public NaluInterface
 {
 public:
-	static std::shared_ptr<NALUBase> Create(ByteReader& data, uint8_t nalu_len_size);
-	NALUBase(ByteReader& data, uint8_t nalu_len_size);
-	virtual ~NALUBase();
+	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint8_t nalu_len_size);
+	NaluBase(ByteReader& data, uint8_t nalu_len_size);
+	virtual ~NaluBase();
 	bool IsGood() { return is_good_; }
 	bool IsNoBother() { return no_bother; }
 	void ReleaseRbsp();
 
+	virtual uint8_t Importance() override;
+	virtual std::string NaluType() override;
+	virtual uint32_t NaluSize() override;
+	virtual std::string SliceType() override;
+	virtual std::string ExtraInfo() override;
+
 private:
 	//don't change ByteReader position, get the nalu type
-	static NALUType GetNALUType(const ByteReader& data, uint8_t nalu_len_size);
+	static EnNaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
 
 public:
-	static std::shared_ptr<NALUBase> CurrentSPS;
-	static std::shared_ptr<NALUBase> CurrentPPS;
+	static std::shared_ptr<NaluBase> CurrentSps;
+	static std::shared_ptr<NaluBase> CurrentPps;
 
 protected:
 	uint32_t nalu_size_ = 0;
-	std::shared_ptr<NALUHeader> nalu_header_;
+	std::shared_ptr<NaluHeader> nalu_header_;
 	uint8_t *rbsp_ = NULL;
 	uint32_t rbsp_size_ = 0;
 	bool is_good_ = false;
 	bool no_bother = false;
 };
 
-class NALUSPS : public NALUBase
+class NaluSps : public NaluBase
 {
 public:
-	NALUSPS(ByteReader& data, uint8_t nalu_len_size);
+	NaluSps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<sps_t> sps_;
+
+	virtual std::string ExtraInfo() override;
 };
 
-class NALUPPS : public NALUBase
+class NaluPps : public NaluBase
 {
 public:
-	NALUPPS(ByteReader& data, uint8_t nalu_len_size);
+	NaluPps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<pps_t> pps_;
+
+	virtual std::string ExtraInfo() override;
 };
 
-class NALUSlice : public NALUBase
+class NaluSlice : public NaluBase
 {
 public:
-	NALUSlice(ByteReader& data, uint8_t nalu_len_size);
+	NaluSlice(ByteReader& data, uint8_t nalu_len_size);
+
+	virtual std::string SliceType() override;
+	virtual std::string ExtraInfo() override;
 
 private:
 	std::shared_ptr<slice_header_t> slice_header_;
 };
 
-class NALUSEI : public NALUBase
+class NaluSEI : public NaluBase
 {
 public:
-	NALUSEI(ByteReader& data, uint8_t nalu_len_size);
-	~NALUSEI();
+	NaluSEI(ByteReader& data, uint8_t nalu_len_size);
+	~NaluSEI();
+
+	virtual std::string ExtraInfo() override;
 
 private:
 	sei_t** seis_ = NULL;
 	uint32_t sei_num_ = 0;
 };
 
-class VideoTagBodyAVCNALU : public VideoTagBody
+class VideoTagBodyAVCNalu : public VideoTagBody
 {
 public:
-	VideoTagBodyAVCNALU(ByteReader& data);
-	~VideoTagBodyAVCNALU() {}
+	VideoTagBodyAVCNalu(ByteReader& data);
+	~VideoTagBodyAVCNalu() {}
+	uint32_t GetCts() { return cts_; }
+	virtual NaluList EnumNalus() override;
 
 private:
-	uint32_t cts_;
-	std::list<std::shared_ptr<NALUBase> > nalu_list_;
+	uint32_t cts_ = 0;
+	std::list<std::shared_ptr<NaluBase> > nalu_list_;
 };
 
 struct AVCDecoderConfigurationRecord
@@ -375,23 +434,26 @@ struct AVCDecoderConfigurationRecord
 	uint8_t  AVCLevelIndication;
 	uint8_t  lengthSizeMinusOne;
 	uint8_t  numOfSequenceParameterSets;
-	std::shared_ptr<NALUBase> sps_nal_;
+	std::shared_ptr<NaluBase> sps_nal_;
 	uint8_t  numOfPictureParameterSets;
-	std::shared_ptr<NALUBase> pps_nal_;
+	std::shared_ptr<NaluBase> pps_nal_;
 
 	bool is_good_;
 
 	AVCDecoderConfigurationRecord(ByteReader& data);
 };
 
-class VideoTagBodySPSPPS : public VideoTagBody
+class VideoTagBodySpsPps : public VideoTagBody
 {
 public:
-	VideoTagBodySPSPPS(ByteReader& data);
-	~VideoTagBodySPSPPS() {}
+	VideoTagBodySpsPps(ByteReader& data);
+	~VideoTagBodySpsPps() {}
+	uint32_t GetCts() { return cts_; }
+
+	virtual NaluList EnumNalus() override;
 
 private:
-	uint32_t cts_;
+	uint32_t cts_ = 0;
 	std::shared_ptr<AVCDecoderConfigurationRecord> avc_config_;
 };
 
@@ -399,9 +461,10 @@ class VideoTagBodySequenceEnd : public VideoTagBody
 {
 public:
 	VideoTagBodySequenceEnd(ByteReader& data);
+	uint32_t GetCts() { return cts_; }
 
 private:
-	uint32_t cts_;
+	uint32_t cts_ = 0;
 };
 
 class VideoTagBodyNonAVC : public VideoTagBody
@@ -415,6 +478,12 @@ class FlvTagDataVideo : public FlvTagData
 public:
 	FlvTagDataVideo(ByteReader& data);
 	~FlvTagDataVideo() {}
+
+	virtual uint32_t GetCts() override;
+	virtual std::string GetSubTypeString() override;
+	virtual std::string GetFormatString() override;
+	virtual std::string GetExtraInfo() override;
+	virtual NaluList EnumNalus() override;
 
 private:
 	std::shared_ptr<VideoTagHeader> video_tag_header_;
