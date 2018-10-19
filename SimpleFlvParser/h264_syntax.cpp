@@ -625,6 +625,12 @@ void read_slice_header_rbsp(slice_header_t* sh, BitReader& b, uint8_t nal_unit_t
 	}
 }
 
+std::string GetSliceTypeString(EnSliceType type)
+{
+	static const char* slice_type_strings[10] = { "P", "B", "I", "SP", "SI", "P", "B", "I", "SP", "SI"};
+	return slice_type_strings[type];
+}
+
 sei_t* sei_new()
 {
 	sei_t* s = (sei_t*)malloc(sizeof(sei_t));

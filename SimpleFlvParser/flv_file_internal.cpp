@@ -297,13 +297,19 @@ std::string FlvTagDataAudio::GetSubTypeString()
 
 std::string FlvTagDataAudio::GetFormatString()
 {
-	//TODO
+	if (audio_tag_header_)
+		return GetAudioFormatString(audio_tag_header_->audio_format_) + " | "
+		+ GetAudioSamplerateString(audio_tag_header_->samplerate_) + " | "
+		+ GetAudioSampleWidthString(audio_tag_header_->sample_width_) + " | "
+		+ GetAudioChannelNumString(audio_tag_header_->channel_num_)
+		+ "(Not exact)";
 	return "";
 }
 
 std::string FlvTagDataAudio::GetExtraInfo()
 {
-	//TODO
+	if (audio_tag_body_)
+		return audio_tag_body_->GetExtraInfo();
 	return "";
 }
 
@@ -372,6 +378,86 @@ AudioTagHeader::AudioTagHeader(ByteReader& data)
 	is_good_ = true;
 }
 
+std::string GetAudioFormatString(AudioFormat fmt)
+{
+	switch (fmt)
+	{
+	case AudioFormatLinearPCMPE:
+		return "Linear PCM PE";
+	case AudioFormatADPCM:
+		return "ADPCM";
+	case AudioFormatMP3:
+		return "MP3";
+	case AudioFormatLinearPCMLE:
+		return "Linear PCM LE";
+	case AudioFormatNellymoser16kHz:
+		return "Nellymoser 16kHz";
+	case AudioFormatNellymoser8kHz:
+		return "Nellymoser 8kHz";
+	case AudioFormatNellymoser:
+		return "Nellymoser";
+	case AudioFormatG711ALawPCM:
+		return "G711 ALaw PCM";
+	case AudioFormatG711MuLawPCM:
+		return "G711 MuLaw PCM";
+	case AudioFormatReserved:
+		return "Reserved";
+	case AudioFormatAAC:
+		return "AAC";
+	case AudioFormatSpeex:
+		return "Speex";
+	case AudioFormatMP38kHZ:
+		return "MP3 8kHZ";
+	case AudioFormatDevideSpecific:
+		return "Devide Specific";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+std::string GetAudioSamplerateString(AudioSamplerate samplerate)
+{
+	switch (samplerate)
+	{
+	case AudioSamplerate5p5K:
+		return "5.5kHz";
+	case AudioSamplerate11K:
+		return "11kHz";
+	case AudioSamplerate22K:
+		return "22kHz";
+	case AudioSamplerate44K:
+		return "44kHz";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+std::string GetAudioSampleWidthString(AudioSampleWidth sample_width)
+{
+	switch (sample_width)
+	{
+	case AudioSampleWidth8Bit:
+		return "8bit";
+	case AudioSampleWidth16Bit:
+		return "16bit";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+std::string GetAudioChannelNumString(AudioChannelNum channel_num)
+{
+	switch (channel_num)
+	{
+	case AudioChannelMono:
+		return "Mono";
+	case AudioChannelStereo:
+		return "Stereo";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
 std::string GetAudioTagTypeString(AudioTagType type)
 {
 	switch (type)
@@ -421,6 +507,19 @@ AudioSpecificConfig::AudioSpecificConfig(ByteReader& data)
 	is_good_ = true;
 }
 
+std::string AudioSpecificConfig::Serialize()
+{
+	Json::Value root, aac_config;
+	aac_config["object_type"] = audioObjectType;
+	aac_config["frequency_index"] = samplingFrequencyIndex;
+	aac_config["channel_configuration"] = channelConfiguration;
+	aac_config["frame_length_flag"] = frameLengthFlag;
+	aac_config["depends_on_core_coder"] = dependsOnCoreCoder;
+	aac_config["extension_flag"] = extensionFlag;
+	root["aac_config"] = aac_config;
+	return root.toStyledString();
+}
+
 AudioTagBodyAACConfig::AudioTagBodyAACConfig(ByteReader& data)
 {
 	aac_config_ = std::make_shared<AudioSpecificConfig>(data);
@@ -429,6 +528,13 @@ AudioTagBodyAACConfig::AudioTagBodyAACConfig(ByteReader& data)
 
 	audio_tag_type_ = AudioTagTypeAACConfig;
 	is_good_ = true;
+}
+
+std::string AudioTagBodyAACConfig::GetExtraInfo()
+{
+	if (aac_config_)
+		return aac_config_->Serialize();
+	return "";
 }
 
 AudioTagBodyAACData::AudioTagBodyAACData(ByteReader& data)
@@ -472,13 +578,16 @@ std::string FlvTagDataVideo::GetSubTypeString()
 
 std::string FlvTagDataVideo::GetFormatString()
 {
-	//TODO
+	if (video_tag_header_)
+		return GetFlvVideoFrameTypeString(video_tag_header_->frame_type_) + " | "
+		+ GetFlvVideoCodecIDString(video_tag_header_->codec_id_);
 	return "";
 }
 
 std::string FlvTagDataVideo::GetExtraInfo()
 {
-	//TODO
+	if (video_tag_body_)
+		; //TODO
 	return "";
 }
 
@@ -487,6 +596,48 @@ NaluList FlvTagDataVideo::EnumNalus()
 	if (video_tag_body_)
 		return video_tag_body_->EnumNalus();
 	return NaluList();
+}
+
+std::string GetFlvVideoFrameTypeString(FlvVideoFrameType type)
+{
+	switch (type)
+	{
+	case FlvVideoFrameTypeKeyFrame:
+		return "Key Frame";
+	case FlvVideoFrameTypeInterFrame:
+		return "Inter Frame";
+	case FlvVideoFrameTypeDisposableInterFrame:
+		return "Disposable Inter Frame";
+	case FlvVideoFrameTypeGeneratedKeyFrame:
+		return "Generated Key Frame";
+	case FlvVideoFrameTypeVideoInfo:
+		return "Video Info";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+std::string GetFlvVideoCodecIDString(FlvVideoCodecID id)
+{
+	switch (id)
+	{
+	case FlvVideoCodeIDJPEG:
+		return "JPEG";
+	case FlvVideoCodeIDSorensonH263:
+		return "Sorenson H.263";
+	case FlvVideoCodeIDScreenVideo:
+		return "Screen Video";
+	case FlvVideoCodeIDOn2VP6:
+		return "On2 VP6";
+	case FlvVideoCodeIDOn2VP6Alpha:
+		return "On2 VP6 Alpha";
+	case FlvVideoCodeIDScreenVideoV2:
+		return "Screen Video V2";
+	case FlvVideoCodeIDAVC:
+		return "AVC";
+	default:
+		return STRING_UNKNOWN;
+	}
 }
 
 VideoTagHeader::VideoTagHeader(ByteReader& data)
@@ -795,7 +946,8 @@ NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size)
 
 std::string NaluSlice::SliceType()
 {
-	//TODO
+	if (slice_header_)
+		return GetSliceTypeString((EnSliceType)slice_header_->slice_type);
 	return "";
 }
 
@@ -866,6 +1018,21 @@ NaluList VideoTagBodyAVCNalu::EnumNalus()
 	return list;
 }
 
+std::string VideoTagBodyAVCNalu::GetExtraInfo()
+{
+	Json::Value root, nalus;
+	for (const auto& item : nalu_list_)
+	{
+		Json::Value nalu, nalu_header, nalu_payload;
+		nalu["nalu_size"] = item->NaluSize();
+		nalu_header["nal_ref_idc"] = item->GetNaluHeader()->nal_ref_idc_;
+		nalu_header["nal_unit_type"] = GetNaluTypeString(item->GetNaluHeader()->nal_unit_type_);
+		nalu["nalu_header"] = nalu_header;
+		nalu_payload;
+	}
+	throw std::logic_error("The method or operation is not implemented.");
+}
+
 AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
 {
 	memset(this, 0, sizeof(AVCDecoderConfigurationRecord));
@@ -923,6 +1090,11 @@ NaluList VideoTagBodySpsPps::EnumNalus()
 			list.push_back(avc_config_->pps_nal_);
 	}
 	return list;
+}
+
+std::string VideoTagBodySpsPps::GetExtraInfo()
+{
+	throw std::logic_error("The method or operation is not implemented.");
 }
 
 VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)

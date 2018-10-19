@@ -2,6 +2,7 @@
 #define SFP_H264_SYNTAX_H
 
 #include "bytes.h"
+#include <string>
 
 //7.4.3 Table 7-6. Name association to slice_type
 #define SLICE_TYPE_P        0        // P (P slice)
@@ -239,6 +240,17 @@ typedef struct
 		uint8_t max_long_term_frame_idx_plus1;
 	} drpm; // decoded ref pic marking
 } slice_header_t;
+
+typedef enum
+{
+	SliceTypeP = 0,
+	SliceTypeB,
+	SliceTypeI,
+	SliceTypeSP,
+	SliceTypeSI
+} EnSliceType;
+
+std::string GetSliceTypeString(EnSliceType type);
 
 typedef struct
 {

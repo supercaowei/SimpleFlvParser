@@ -21,23 +21,22 @@ int main(int argc, char* argv[])
 		return -1;
 
 	std::shared_ptr<FlvFile> flv;
-	std::shared_ptr<FlvOutputInterface> output;
-	FlvHeaderCallback header_cb;
-	FlvTagCallback tag_cb;
-	NaluCallback nalu_cb;
 
 	//begin parsing flv file
 	flv = std::make_shared<FlvFile>(flv_file);
 
 	//open an output
+	if (!db_file.empty())
+	{
+		std::shared_ptr<FlvOutputInterface> output = std::make_shared<DBOutput>(db_file);
+		//get the output callbacks
+		FlvHeaderCallback header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
+		FlvTagCallback tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
+		NaluCallback nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
 
-	//get the output callbacks
-	header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
-	tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
-	nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
-
-	//do output
-	flv->Output(header_cb, tag_cb, nalu_cb);
+		//do output
+		flv->Output(header_cb, tag_cb, nalu_cb);
+	}
 
 	return 0;
 }

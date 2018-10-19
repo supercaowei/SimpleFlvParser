@@ -172,6 +172,10 @@ enum AudioTagType
 	AudioTagTypeAACData   = 1
 };
 
+std::string GetAudioFormatString(AudioFormat fmt);
+std::string GetAudioSamplerateString(AudioSamplerate samplerate);
+std::string GetAudioSampleWidthString(AudioSampleWidth sample_width);
+std::string GetAudioChannelNumString(AudioChannelNum channel_num);
 std::string GetAudioTagTypeString(AudioTagType type);
 
 struct AudioTagHeader
@@ -191,6 +195,7 @@ public:
 	static std::shared_ptr<AudioTagBody> Create(ByteReader& data, AudioFormat audio_format);
 	virtual ~AudioTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual std::string GetExtraInfo() { return ""; }
 	AudioTagType GetAudioTagType() { return audio_tag_type_; }
 
 protected:
@@ -212,12 +217,14 @@ struct AudioSpecificConfig
 	bool    is_good_;
 
 	AudioSpecificConfig(ByteReader& data);
+	std::string Serialize();
 };
 
 class AudioTagBodyAACConfig : public AudioTagBody
 {
 public:
 	AudioTagBodyAACConfig(ByteReader& data);
+	virtual std::string GetExtraInfo() override;
 
 private:
 	std::shared_ptr<AudioSpecificConfig> aac_config_;
@@ -272,6 +279,9 @@ enum FlvVideoCodecID
 	FlvVideoCodeIDAVC               = 7, //AVC
 };
 
+std::string GetFlvVideoFrameTypeString(FlvVideoFrameType type);
+std::string GetFlvVideoCodecIDString(FlvVideoCodecID id);
+
 struct VideoTagHeader
 {
 	FlvVideoFrameType frame_type_;
@@ -300,6 +310,7 @@ public:
 	virtual uint32_t GetCts() { return 0; }
 	virtual VideoTagType GetVideoTagType() { return video_tag_type_; }
 	virtual NaluList EnumNalus() { return NaluList(); }
+	virtual std::string GetExtraInfo() { return ""; }
 
 protected:
 	VideoTagBody() = default;
@@ -348,6 +359,7 @@ public:
 	bool IsGood() { return is_good_; }
 	bool IsNoBother() { return no_bother; }
 	void ReleaseRbsp();
+	const std::shared_ptr<NaluHeader>& GetNaluHeader() { return nalu_header_; }
 
 	virtual uint8_t Importance() override;
 	virtual std::string NaluType() override;
@@ -422,6 +434,7 @@ public:
 	~VideoTagBodyAVCNalu() {}
 	virtual uint32_t GetCts() override { return cts_; }
 	virtual NaluList EnumNalus() override;
+	virtual std::string GetExtraInfo() override;
 
 private:
 	uint32_t cts_ = 0;
@@ -451,6 +464,7 @@ public:
 	~VideoTagBodySpsPps() {}
 	virtual uint32_t GetCts() override { return cts_; }
 	virtual NaluList EnumNalus() override;
+	virtual std::string GetExtraInfo() override;
 
 private:
 	uint32_t cts_ = 0;
