@@ -26,6 +26,7 @@ public:
 	virtual bool HaveVideo() override;
 	virtual bool HaveAudio() override;
 	virtual uint8_t Version() override;
+	virtual uint8_t HeaderSize() override;
 
 private:
 	uint8_t  version_     = 0;
@@ -66,6 +67,7 @@ public:
 	static std::shared_ptr<FlvTagData> Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type);
 	virtual ~FlvTagData() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual void SetTagSerial(int tag_serial) {}
 	virtual uint32_t GetCts() { return 0; }
 	virtual std::string GetSubTypeString() { return ""; }
 	virtual std::string GetFormatString() { return ""; }
@@ -116,6 +118,7 @@ class FlvTagDataScript : public FlvTagData
 public:
 	FlvTagDataScript(ByteReader& data);
 	~FlvTagDataScript() {}
+	virtual std::string GetExtraInfo() override;
 
 private:
 	static void DecodeAMF(const AMFObject* amf, Json::Value& json);
@@ -139,7 +142,7 @@ enum AudioFormat
 	AudioFormatG711ALawPCM     = 7,  //7 -- G.711 A-law logarithmic PCM
 	AudioFormatG711MuLawPCM    = 8,  //8 -- G.711 mu-law logarithmic PCM
 	AudioFormatReserved        = 9,  //9 -- reserved
-	AudioFormatAAC             = 10, //10 �C AAC
+	AudioFormatAAC             = 10, //10 - AAC
 	AudioFormatSpeex           = 11, //11 - Speex
 	AudioFormatMP38kHZ         = 14, //14 - MP3 8-kHz
 	AudioFormatDevideSpecific  = 15, //15 - Device-specific sound
@@ -202,8 +205,8 @@ protected:
 	AudioTagBody() = default;
 
 protected:
-	AudioTagType audio_tag_type_;
 	bool is_good_ = false;
+	AudioTagType audio_tag_type_;
 };
 
 struct AudioSpecificConfig
@@ -307,6 +310,7 @@ public:
 	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodecID codec_id);
 	virtual ~VideoTagBody() {}
 	virtual bool IsGood() { return is_good_; }
+	virtual void SetTagSerial(int tag_serial) {}
 	virtual uint32_t GetCts() { return 0; }
 	virtual VideoTagType GetVideoTagType() { return video_tag_type_; }
 	virtual NaluList EnumNalus() { return NaluList(); }
@@ -320,7 +324,7 @@ protected:
 	VideoTagType video_tag_type_;
 };
 
-enum EnNaluType
+enum NaluType
 {
 	NaluTypeUnknown    = -1,
 	NaluTypeUnused     = 0,
@@ -340,12 +344,12 @@ enum EnNaluType
 	NaluTypeSliceAux   = 19,
 };
 
-std::string GetNaluTypeString(EnNaluType type);
+std::string GetNaluTypeString(NaluType type);
 
 struct NaluHeader
 {
 	uint8_t    nal_ref_idc_;
-	EnNaluType nal_unit_type_;
+	NaluType nal_unit_type_;
 
 	NaluHeader(uint8_t b);
 };
@@ -359,23 +363,33 @@ public:
 	bool IsGood() { return is_good_; }
 	bool IsNoBother() { return no_bother; }
 	void ReleaseRbsp();
+	void SetTagSerialBelong(int tag_serial_belong) { tag_serial_belong_ = tag_serial_belong; }
 	const std::shared_ptr<NaluHeader>& GetNaluHeader() { return nalu_header_; }
+	virtual std::string CompleteInfo();
 
-	virtual uint8_t Importance() override;
-	virtual std::string NaluType() override;
+	virtual int TagSerialBelong() override;
 	virtual uint32_t NaluSize() override;
+	virtual uint8_t NalRefIdc() override;
+	virtual std::string NalUnitType() override;
+	virtual int8_t FirstMbInSlice() override;
 	virtual std::string SliceType() override;
+	virtual int PicParameterSetId() override;
+	virtual int FrameNum() override;
+	virtual int FieldPicFlag() override;
+	virtual int PicOrderCntLsb() override;
+	virtual int SliceQpDelta() override;
 	virtual std::string ExtraInfo() override;
 
 private:
 	//don't change ByteReader position, get the nalu type
-	static EnNaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
+	static NaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
 
 public:
 	static std::shared_ptr<NaluBase> CurrentSps;
 	static std::shared_ptr<NaluBase> CurrentPps;
 
 protected:
+	int tag_serial_belong_ = -1;
 	uint32_t nalu_size_ = 0;
 	std::shared_ptr<NaluHeader> nalu_header_;
 	uint8_t *rbsp_ = NULL;
@@ -390,6 +404,7 @@ public:
 	NaluSps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<sps_t> sps_;
 
+	virtual std::string CompleteInfo() override;
 	virtual std::string ExtraInfo() override;
 };
 
@@ -399,6 +414,7 @@ public:
 	NaluPps(ByteReader& data, uint8_t nalu_len_size);
 	std::shared_ptr<pps_t> pps_;
 
+	virtual std::string CompleteInfo() override;
 	virtual std::string ExtraInfo() override;
 };
 
@@ -407,7 +423,14 @@ class NaluSlice : public NaluBase
 public:
 	NaluSlice(ByteReader& data, uint8_t nalu_len_size);
 
+	virtual std::string CompleteInfo() override;
+	virtual int8_t FirstMbInSlice() override;
 	virtual std::string SliceType() override;
+	virtual int PicParameterSetId() override;
+	virtual int FrameNum() override;
+	virtual int FieldPicFlag() override;
+	virtual int PicOrderCntLsb() override;
+	virtual int SliceQpDelta() override;
 	virtual std::string ExtraInfo() override;
 
 private:
@@ -420,6 +443,7 @@ public:
 	NaluSEI(ByteReader& data, uint8_t nalu_len_size);
 	~NaluSEI();
 
+	virtual std::string CompleteInfo() override;
 	virtual std::string ExtraInfo() override;
 
 private:
@@ -432,6 +456,7 @@ class VideoTagBodyAVCNalu : public VideoTagBody
 public:
 	VideoTagBodyAVCNalu(ByteReader& data);
 	~VideoTagBodyAVCNalu() {}
+	virtual void SetTagSerial(int tag_serial) override;
 	virtual uint32_t GetCts() override { return cts_; }
 	virtual NaluList EnumNalus() override;
 	virtual std::string GetExtraInfo() override;
@@ -462,6 +487,7 @@ class VideoTagBodySpsPps : public VideoTagBody
 public:
 	VideoTagBodySpsPps(ByteReader& data);
 	~VideoTagBodySpsPps() {}
+	virtual void SetTagSerial(int tag_serial) override;
 	virtual uint32_t GetCts() override { return cts_; }
 	virtual NaluList EnumNalus() override;
 	virtual std::string GetExtraInfo() override;
@@ -493,6 +519,7 @@ public:
 	FlvTagDataVideo(ByteReader& data);
 	~FlvTagDataVideo() {}
 
+	virtual void SetTagSerial(int tag_serial) override;
 	virtual uint32_t GetCts() override;
 	virtual std::string GetSubTypeString() override;
 	virtual std::string GetFormatString() override;

@@ -29,13 +29,16 @@ int main(int argc, char* argv[])
 	if (!db_file.empty())
 	{
 		std::shared_ptr<FlvOutputInterface> output = std::make_shared<DBOutput>(db_file);
-		//get the output callbacks
-		FlvHeaderCallback header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
-		FlvTagCallback tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
-		NaluCallback nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
+		if (output && output->IsGood())
+		{
+			//get the output callbacks
+			FlvHeaderCallback header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
+			FlvTagCallback tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
+			NaluCallback nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
 
-		//do output
-		flv->Output(header_cb, tag_cb, nalu_cb);
+			//do output
+			flv->Output(header_cb, tag_cb, nalu_cb);
+		}
 	}
 
 	return 0;

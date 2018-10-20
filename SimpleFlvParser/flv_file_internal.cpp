@@ -1,5 +1,6 @@
 #include "flv_file_internal.h"
 #include "utils.h"
+#include "json/reader.h"
 
 #define FLV_HEADER_SIZE           9
 #define PREVIOUS_TAG_SIZE_SIZE    4
@@ -44,6 +45,11 @@ bool FlvHeader::HaveAudio()
 uint8_t FlvHeader::Version()
 {
 	return version_;
+}
+
+uint8_t FlvHeader::HeaderSize()
+{
+	return header_size_;
 }
 
 std::string GetFlvTagTypeString(FlvTagType type)
@@ -113,6 +119,7 @@ FlvTag::FlvTag(ByteReader& data, int tag_serial)
 	tag_data_ = FlvTagData::Create(data, tag_header_->tag_data_size_, tag_header_->tag_type_);
 	if (!tag_data_ || !tag_data_->IsGood())
 		return;
+	tag_data_->SetTagSerial(tag_serial_);
 
 	is_good_ = true;
 }
@@ -231,6 +238,11 @@ FlvTagDataScript::FlvTagDataScript(ByteReader& data)
 	is_good_ = true;
 }
 
+std::string FlvTagDataScript::GetExtraInfo()
+{
+	return script_data_.toStyledString();
+}
+
 void FlvTagDataScript::DecodeAMF(const AMFObject* amf, Json::Value& json)
 {
 	for (int i = 0; i < amf->o_num; i++)
@@ -301,8 +313,8 @@ std::string FlvTagDataAudio::GetFormatString()
 		return GetAudioFormatString(audio_tag_header_->audio_format_) + " | "
 		+ GetAudioSamplerateString(audio_tag_header_->samplerate_) + " | "
 		+ GetAudioSampleWidthString(audio_tag_header_->sample_width_) + " | "
-		+ GetAudioChannelNumString(audio_tag_header_->channel_num_)
-		+ "(Not exact)";
+		+ GetAudioChannelNumString(audio_tag_header_->channel_num_);
+
 	return "";
 }
 
@@ -562,6 +574,12 @@ FlvTagDataVideo::FlvTagDataVideo(ByteReader& data)
 	is_good_ = true;
 }
 
+void FlvTagDataVideo::SetTagSerial(int tag_serial)
+{
+	if (video_tag_body_)
+		video_tag_body_->SetTagSerial(tag_serial);
+}
+
 uint32_t FlvTagDataVideo::GetCts()
 {
 	if (video_tag_body_)
@@ -587,7 +605,7 @@ std::string FlvTagDataVideo::GetFormatString()
 std::string FlvTagDataVideo::GetExtraInfo()
 {
 	if (video_tag_body_)
-		; //TODO
+		return video_tag_body_->GetExtraInfo();
 	return "";
 }
 
@@ -709,14 +727,13 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 		default:
 			return std::shared_ptr<VideoTagBody>(nullptr);
 		}
-		break;
 	}
 	default:
 		return std::make_shared<VideoTagBodyNonAVC>(data);
 	}
 }
 
-std::string GetNaluTypeString(EnNaluType type)
+std::string GetNaluTypeString(NaluType type)
 {
 	switch (type)
 	{
@@ -757,7 +774,7 @@ std::string GetNaluTypeString(EnNaluType type)
 
 NaluHeader::NaluHeader(uint8_t b)
 {
-	nal_unit_type_ = (EnNaluType)(b & 0x1f);
+	nal_unit_type_ = (NaluType)(b & 0x1f);
 	nal_ref_idc_ = (b >> 5) & 0x03;
 }
 
@@ -765,7 +782,8 @@ std::shared_ptr<NaluBase> NaluBase::CurrentSps = std::shared_ptr<NaluBase>(nullp
 std::shared_ptr<NaluBase> NaluBase::CurrentPps = std::shared_ptr<NaluBase>(nullptr);
 std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_size)
 {
-	EnNaluType nalu_type = GetNaluType(data, nalu_len_size);
+	NaluType nalu_type = GetNaluType(data, nalu_len_size);
+
 	switch (nalu_type)
 	{
 	case NaluTypeNonIDR:
@@ -824,7 +842,7 @@ NaluBase::~NaluBase()
 	ReleaseRbsp();
 }
 
-EnNaluType NaluBase::GetNaluType(const ByteReader& data, uint8_t nalu_len_size)
+NaluType NaluBase::GetNaluType(const ByteReader& data, uint8_t nalu_len_size)
 {
 	if (nalu_len_size > 4)
 		return NaluTypeUnknown;
@@ -833,7 +851,7 @@ EnNaluType NaluBase::GetNaluType(const ByteReader& data, uint8_t nalu_len_size)
 		return NaluTypeUnknown;
 	
 	uint8_t nalu_header = *(data.CurrentPos() + nalu_len_size);
-	return (EnNaluType)(nalu_header & 0x1f);
+	return (NaluType)(nalu_header & 0x1f);
 }
 
 void NaluBase::ReleaseRbsp()
@@ -846,18 +864,24 @@ void NaluBase::ReleaseRbsp()
 	}
 }
 
-uint8_t NaluBase::Importance()
+std::string NaluBase::CompleteInfo()
 {
+	Json::Value json_nalu;
+
+	json_nalu["nal_unit_size"] = nalu_size_;
 	if (nalu_header_)
-		return nalu_header_->nal_ref_idc_;
-	return 0;
+	{
+		json_nalu["forbidden_zero_bit"] = 0;
+		json_nalu["nal_ref_idc"] = nalu_header_->nal_ref_idc_;
+		json_nalu["nal_unit_type"] = GetNaluTypeString(nalu_header_->nal_unit_type_);
+	}
+
+	return json_nalu.toStyledString();
 }
 
-std::string NaluBase::NaluType()
+int NaluBase::TagSerialBelong()
 {
-	if (nalu_header_)
-		return GetNaluTypeString(nalu_header_->nal_unit_type_);
-	return "";
+	return tag_serial_belong_;
 }
 
 uint32_t NaluBase::NaluSize()
@@ -865,9 +889,53 @@ uint32_t NaluBase::NaluSize()
 	return nalu_size_;
 }
 
+uint8_t NaluBase::NalRefIdc()
+{
+	if (nalu_header_)
+		return nalu_header_->nal_ref_idc_;
+	return 0;
+}
+
+std::string NaluBase::NalUnitType()
+{
+	if (nalu_header_)
+		return GetNaluTypeString(nalu_header_->nal_unit_type_);
+	return "";
+}
+
+int8_t NaluBase::FirstMbInSlice()
+{
+	return -1;
+}
+
 std::string NaluBase::SliceType()
 {
 	return "";
+}
+
+int NaluBase::PicParameterSetId()
+{
+	return -1;
+}
+
+int NaluBase::FrameNum()
+{
+	return -1;
+}
+
+int NaluBase::FieldPicFlag()
+{
+	return -1;
+}
+
+int NaluBase::PicOrderCntLsb()
+{
+	return -1;
+}
+
+int NaluBase::SliceQpDelta()
+{
+	return -1;
 }
 
 std::string NaluBase::ExtraInfo()
@@ -892,9 +960,20 @@ NaluSps::NaluSps(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
+std::string NaluSps::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(NaluBase::CompleteInfo(), json_nalu);
+	if (sps_)
+		json_nalu["sps"] = sps_to_json(sps_.get());
+	return json_nalu.toStyledString();
+}
+
 std::string NaluSps::ExtraInfo()
 {
-	//TODO
+	if (sps_)
+		return sps_to_json(sps_.get()).toStyledString();
 	return "";
 }
 
@@ -915,9 +994,20 @@ NaluPps::NaluPps(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
+std::string NaluPps::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(NaluBase::CompleteInfo(), json_nalu);
+	if (pps_)
+		json_nalu["pps"] = pps_to_json(pps_.get());
+	return json_nalu.toStyledString();
+}
+
 std::string NaluPps::ExtraInfo()
 {
-	//TODO
+	if (pps_)
+		return pps_to_json(pps_.get()).toStyledString();
 	return "";
 }
 
@@ -944,16 +1034,67 @@ NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size)
 	is_good_ = true;
 }
 
+std::string NaluSlice::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(NaluBase::CompleteInfo(), json_nalu);
+	if (slice_header_)
+		json_nalu["slice_header"] = slice_header_to_json(slice_header_.get(), nalu_header_->nal_unit_type_, nalu_header_->nal_ref_idc_);
+	return json_nalu.toStyledString();
+}
+
+int8_t NaluSlice::FirstMbInSlice()
+{
+	if (slice_header_)
+		return slice_header_->first_mb_in_slice;
+	return NaluBase::FirstMbInSlice();
+}
+
 std::string NaluSlice::SliceType()
 {
 	if (slice_header_)
-		return GetSliceTypeString((EnSliceType)slice_header_->slice_type);
-	return "";
+		return GetSliceTypeString(slice_header_->slice_type);
+	return NaluBase::SliceType();
+}
+
+int NaluSlice::PicParameterSetId()
+{
+	if (slice_header_)
+		return slice_header_->pic_parameter_set_id;
+	return NaluBase::PicParameterSetId();
+}
+
+int NaluSlice::FrameNum()
+{
+	if (slice_header_)
+		return slice_header_->frame_num;
+	return NaluBase::FrameNum();
+}
+
+int NaluSlice::FieldPicFlag()
+{
+	if (slice_header_)
+		return slice_header_->field_pic_flag;
+	return NaluBase::FieldPicFlag();
+}
+
+int NaluSlice::PicOrderCntLsb()
+{
+	if (slice_header_)
+		return slice_header_->pic_order_cnt_lsb;
+	return NaluBase::PicOrderCntLsb();
+}
+
+int NaluSlice::SliceQpDelta()
+{
+	if (slice_header_)
+		return slice_header_->slice_qp_delta;
+	return NaluBase::SliceQpDelta();
 }
 
 std::string NaluSlice::ExtraInfo()
 {
-	//TODO
 	return "";
 }
 
@@ -984,10 +1125,14 @@ NaluSEI::~NaluSEI()
 	}
 }
 
+std::string NaluSEI::CompleteInfo()
+{
+	return ExtraInfo();
+}
+
 std::string NaluSEI::ExtraInfo()
 {
-	//TODO
-	return "";
+	return seis_to_json(seis_, sei_num_).toStyledString();
 }
 
 VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)
@@ -1012,6 +1157,12 @@ VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)
 	is_good_ = true;
 }
 
+void VideoTagBodyAVCNalu::SetTagSerial(int tag_serial)
+{
+	for (const auto& item : nalu_list_)
+		item->SetTagSerialBelong(tag_serial);
+}
+
 NaluList VideoTagBodyAVCNalu::EnumNalus()
 {
 	NaluList list(nalu_list_.begin(), nalu_list_.end());
@@ -1020,17 +1171,18 @@ NaluList VideoTagBodyAVCNalu::EnumNalus()
 
 std::string VideoTagBodyAVCNalu::GetExtraInfo()
 {
-	Json::Value root, nalus;
+	Json::Value root, nalus, nalu;
+	Json::Reader reader;
+
 	for (const auto& item : nalu_list_)
 	{
-		Json::Value nalu, nalu_header, nalu_payload;
-		nalu["nalu_size"] = item->NaluSize();
-		nalu_header["nal_ref_idc"] = item->GetNaluHeader()->nal_ref_idc_;
-		nalu_header["nal_unit_type"] = GetNaluTypeString(item->GetNaluHeader()->nal_unit_type_);
-		nalu["nalu_header"] = nalu_header;
-		nalu_payload;
+		nalu.clear();
+		if (reader.parse(item->CompleteInfo(), nalu))
+			nalus.append(nalu);
 	}
-	throw std::logic_error("The method or operation is not implemented.");
+
+	root["nalu_list"] = nalus;
+	return root.toStyledString();
 }
 
 AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
@@ -1079,6 +1231,17 @@ VideoTagBodySpsPps::VideoTagBodySpsPps(ByteReader& data)
 	is_good_ = true;
 }
 
+void VideoTagBodySpsPps::SetTagSerial(int tag_serial)
+{
+	if (avc_config_)
+	{
+		if (avc_config_->sps_nal_)
+			avc_config_->sps_nal_->SetTagSerialBelong(tag_serial);
+		if (avc_config_->pps_nal_)
+			avc_config_->pps_nal_->SetTagSerialBelong(tag_serial);
+	}
+}
+
 NaluList VideoTagBodySpsPps::EnumNalus()
 {
 	NaluList list;
@@ -1094,7 +1257,22 @@ NaluList VideoTagBodySpsPps::EnumNalus()
 
 std::string VideoTagBodySpsPps::GetExtraInfo()
 {
-	throw std::logic_error("The method or operation is not implemented.");
+	Json::Value extra_info, json_sps, json_pps;
+	Json::Reader reader;
+
+	extra_info["configurationVersion"] = avc_config_->configurationVersion;
+	extra_info["AVCProfileIndication"] = avc_config_->AVCProfileIndication;
+	extra_info["profile_compatibility"] = avc_config_->profile_compatibility;
+	extra_info["AVCLevelIndication"] = avc_config_->AVCLevelIndication;
+	extra_info["lengthSizeMinusOne"] = avc_config_->lengthSizeMinusOne;
+	extra_info["numOfSequenceParameterSets"] = avc_config_->numOfSequenceParameterSets & 0x1F;
+	if (reader.parse(avc_config_->sps_nal_->CompleteInfo(), json_sps))
+		extra_info["nalu_list"].append(json_sps);
+	extra_info["numOfPictureParameterSets"] = avc_config_->numOfPictureParameterSets;
+	if (reader.parse(avc_config_->pps_nal_->CompleteInfo(), json_pps))
+		extra_info["nalu_list"].append(json_pps);
+	
+	return extra_info.toStyledString();
 }
 
 VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)

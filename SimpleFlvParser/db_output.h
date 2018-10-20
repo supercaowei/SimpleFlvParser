@@ -16,9 +16,11 @@ public:
 	virtual void FlvHeaderOutput(const std::shared_ptr<FlvHeaderInterface>& header) override;
 	virtual void FlvTagOutput(const std::shared_ptr<FlvTagInterface>& tag) override;
 	virtual void NaluOutput(const std::shared_ptr<NaluInterface>& nalu) override;
+	virtual bool IsGood() override { return db_ != NULL; }
 
 private:
 	sqlite3* db_ = NULL;
+	int nalu_serial = 0;
 };
 
 
