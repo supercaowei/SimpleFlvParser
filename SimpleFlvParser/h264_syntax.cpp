@@ -1102,7 +1102,7 @@ Json::Value slice_header_to_json(slice_header_t* sh, uint8_t nal_unit_type, uint
 		json_slice_header["redundant_pic_cnt"] = sh->redundant_pic_cnt;
 	if (is_slice_type(sh->slice_type, SLICE_TYPE_B) && sh->direct_spatial_mv_pred_flag)
 		json_slice_header["direct_spatial_mv_pred_flag"] = sh->direct_spatial_mv_pred_flag;
-	if (is_slice_type(sh->slice_type, SLICE_TYPE_P) || is_slice_type(sh->slice_type, SLICE_TYPE_SP) || is_slice_type(sh->slice_type, SLICE_TYPE_B)
+	if ((is_slice_type(sh->slice_type, SLICE_TYPE_P) || is_slice_type(sh->slice_type, SLICE_TYPE_SP) || is_slice_type(sh->slice_type, SLICE_TYPE_B))
 		&& sh->num_ref_idx_active_override_flag)
 	{
 		json_slice_header["num_ref_idx_active_override_flag"] = sh->num_ref_idx_active_override_flag;

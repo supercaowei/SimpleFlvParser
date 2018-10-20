@@ -175,10 +175,6 @@ void DBOutput::FlvTagOutput(const std::shared_ptr<FlvTagInterface>& tag)
 
 void DBOutput::NaluOutput(const std::shared_ptr<NaluInterface>& nalu)
 {
-	"INSERT INTO nal_units(serial, tag_serial_belong, nalu_size, nal_ref_idc, nal_unit_type, \
-				first_mb_in_slice, slice_type, pic_parameter_set_id, frame_num, field_pic_flag, pic_order_cnt_lsb, slice_qp_delta, extra_info) \
-									VALUES( %d , %d , %d , %d , '%s' , %d , '%s' , %d , %d , %d , %d , %d , '%s' )\0";
-
 	static char buff[10240] = { 0 };
 	sprintf(
 		buff, SQL_STAT_INSERT_NALU_FMT,
