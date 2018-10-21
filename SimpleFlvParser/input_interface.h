@@ -25,6 +25,7 @@ public:
 	virtual uint32_t    TagSize() = 0;
 	virtual uint32_t    Pts() = 0;
 	virtual uint32_t    Dts() = 0;
+	virtual int         DtsDiff() = 0;
 	virtual std::string SubType() = 0;
 	virtual std::string Format() = 0;
 	virtual std::string ExtraInfo() = 0;

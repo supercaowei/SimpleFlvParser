@@ -67,6 +67,8 @@ std::string GetFlvTagTypeString(FlvTagType type)
 	}
 }
 
+uint32_t FlvTagHeader::LastTagTimestamp = 0;
+
 FlvTagHeader::FlvTagHeader(ByteReader& data)
 {
 	memset(this, 0, sizeof(FlvTagHeader));
@@ -91,11 +93,19 @@ FlvTagHeader::FlvTagHeader(ByteReader& data)
 	case FlvTagTypeScriptData:
 		break;
 	default:
+		printf("Unknown tag type %d\n", tag_type_);
 		return;
 	}
 
 	is_good_ = true;
+
+	if (timestamp_ < LastTagTimestamp)
+		printf("Warning: current timestamp %llu is smaller than last timestamp %llu.\n", timestamp_, LastTagTimestamp);
+	LastTagTimestamp = timestamp_;
 }
+
+uint32_t FlvTag::LastVideoDts = 0;
+uint32_t FlvTag::LastAudioDts = 0;
 
 FlvTag::FlvTag(ByteReader& data, int tag_serial)
 {
@@ -174,6 +184,25 @@ uint32_t FlvTag::Dts()
 	if (tag_header_)
 		return tag_header_->timestamp_;
 	return 0;
+}
+
+int FlvTag::DtsDiff()
+{
+	int32_t diff = 0;
+	if (tag_header_)
+	{
+		if (tag_header_->tag_type_ == FlvTagTypeVideo)
+		{
+			diff = tag_header_->timestamp_ - LastVideoDts;
+			LastVideoDts = tag_header_->timestamp_;
+		}
+		else if (tag_header_->tag_type_ == FlvTagTypeAudio)
+		{
+			diff = tag_header_->timestamp_ - LastAudioDts;
+			LastAudioDts = tag_header_->timestamp_;
+		}
+	}
+	return diff;
 }
 
 std::string FlvTag::SubType()
@@ -502,6 +531,148 @@ std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat
 	}
 }
 
+std::string GetMPEG4AudioObjectTypeString(MPEG4AudioObjectType type)
+{
+	switch (type)
+	{
+	case MPEG4AudioObjectTypeNull:
+		return "Null";
+	case MPEG4AudioObjectTypeAACMain:
+		return "AAC Main";
+	case MPEG4AudioObjectTypeAACLC:
+		return "AAC LC (Low Complexity)";
+	case MPEG4AudioObjectTypeAACSSR:
+		return "AAC SSR (Scalable Sample Rate)";
+	case MPEG4AudioObjectTypeAACLTP:
+		return "AAC LTP (Long Term Prediction)";
+	case MPEG4AudioObjectTypeSBR:
+		return "SBR (Spectral Band Replication)";
+	case MPEG4AudioObjectTypeAACScalable:
+		return "AAC Scalable";
+	case MPEG4AudioObjectTypeTwinVQ:
+		return "TwinVQ";
+	case MPEG4AudioObjectTypeCELP:
+		return "CELP (Code Excited Linear Prediction)";
+	case MPEG4AudioObjectTypeHXVC:
+		return "HXVC (Harmonic Vector eXcitation Coding)";
+	case MPEG4AudioObjectTypeReserved1:
+		return "Reserved";
+	case MPEG4AudioObjectTypeReserved2:
+		return "Reserved";
+	case MPEG4AudioObjectTypeTTSI:
+		return "TTSI (Text-To-Speech Interface)";
+	case MPEG4AudioObjectTypeMainSynthesis:
+		return "Main Synthesis";
+	case MPEG4AudioObjectTypeWavetableSynthesis:
+		return "Wavetable Synthesis";
+	case MPEG4AudioObjectTypeGeneralMIDI:
+		return "General MIDI";
+	case MPEG4AudioObjectTypeASAE:
+		return "Algorithmic Synthesis and Audio Effects";
+	case MPEG4AudioObjectTypeERAACLC:
+		return "ER (Error Resilient) AAC LC";
+	case MPEG4AudioObjectTypeReserved3:
+		return "Reserved";
+	case MPEG4AudioObjectTypeERAACLTP:
+		return "ER (Error Resilient) AAC LTP";
+	case MPEG4AudioObjectTypeERAACScalable:
+		return "ER (Error Resilient) AAC Scalable";
+	case MPEG4AudioObjectTypeERTwinVQ:
+		return "ER (Error Resilient) TwinVQ";
+	case MPEG4AudioObjectTypeERBSAC:
+		return "ER (Error Resilient) BSAC (Bit-Sliced Arithmetic Coding)";
+	case MPEG4AudioObjectTypeERAACLD:
+		return "ER (Error Resilient) AAC LD (Low Delay)";
+	case MPEG4AudioObjectTypeERCELP:
+		return "ER (Error Resilient) CELP (Code Excited Linear Prediction)";
+	case MPEG4AudioObjectTypeERHVXC:
+		return "ER (Error Resilient) HVXC (Harmonic Vector eXcitation Coding)";
+	case MPEG4AudioObjectTypeERHILN:
+		return "ER (Error Resilient) HILN (Harmonic and Individual Lines plus Noise)";
+	case MPEG4AudioObjectTypeERParametric:
+		return "ER (Error Resilient) Parametric";
+	case MPEG4AudioObjectTypeSSC:
+		return "SSC (SinuSoidal Coding)";
+	case MPEG4AudioObjectTypePS:
+		return "PS (Parametric Stereo)";
+	case MPEG4AudioObjectTypeMPEGSurround:
+		return "MPEG Surround";
+	case MPEG4AudioObjectTypeEscapeValue:
+		return "Escape value";
+	case MPEG4AudioObjectTypeLayer1:
+		return "Layer - 1";
+	case MPEG4AudioObjectTypeLayer2:
+		return "Layer - 2";
+	case MPEG4AudioObjectTypeLayer3:
+		return "Layer - 3";
+	case MPEG4AudioObjectTypeDST:
+		return "DST (Direct Stream Transfer)";
+	case MPEG4AudioObjectTypeALS:
+		return "ALS (Audio Lossless)";
+	case MPEG4AudioObjectTypeSLS:
+		return "SLS (Scalable LosslesS)";
+	case MPEG4AudioObjectTypeSLSNonCore:
+		return "SLS (Scalable LosslesS) non-core";
+	case MPEG4AudioObjectTypeERAACELD:
+		return "ER (Error Resilient) AAC ELD (Enhanced Low Delay)";
+	case MPEG4AudioObjectTypeSMRSimple:
+		return "SMR (Symbolic Music Representation) Simple";
+	case MPEG4AudioObjectTypeSMRMain:
+		return "SMR (Symbolic Music Representation) Main";
+	case MPEG4AudioObjectTypeUSACNoSBR:
+		return "USAC (Unified Speech and Audio Coding) (no SBR)";
+	case MPEG4AudioObjectTypeSAOC:
+		return "SAOC (Spatial Audio Object Coding)";
+	case MPEG4AudioObjectTypeLDMPEGSurround:
+		return "LD MPEG Surround";
+	case MPEG4AudioObjectTypeUSAC:
+		return "USAC (Unified Speech and Audio Coding)";
+	default:
+		return "Null";
+	}
+}
+
+std::string GetMPEG4AudioSamplerateString(MPEG4AudioSamplerate samplerate)
+{
+	switch (samplerate)
+	{
+	case MPEG4AudioSamplerate96000Hz:
+		return "96000 Hz";
+	case MPEG4AudioSamplerate88200Hz:
+		return "88200 Hz";
+	case MPEG4AudioSamplerate64000Hz:
+		return "64000 Hz";
+	case MPEG4AudioSamplerate48000Hz:
+		return "48000 Hz";
+	case MPEG4AudioSamplerate44100Hz:
+		return "44100 Hz";
+	case MPEG4AudioSamplerate32000Hz:
+		return "32000 Hz";
+	case MPEG4AudioSamplerate24000Hz:
+		return "24000 Hz";
+	case MPEG4AudioSamplerate22050Hz:
+		return "22050 Hz";
+	case MPEG4AudioSamplerate16000Hz:
+		return "16000 Hz";
+	case MPEG4AudioSamplerate12000Hz:
+		return "12000 Hz";
+	case MPEG4AudioSamplerate11025Hz:
+		return "11025 Hz";
+	case MPEG4AudioSamplerate8000Hz:
+		return "8000 Hz";
+	case MPEG4AudioSamplerate7350Hz:
+		return "7350 Hz";
+	case MPEG4AudioSamplerateReserved1:
+		return "Reserved";
+	case MPEG4AudioSamplerateReserved2:
+		return "Reserved";
+	case MPEG4AudioSamplerateWrittenExplictly:
+		return "frequency is written explictly";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
 AudioSpecificConfig::AudioSpecificConfig(ByteReader& data)
 {
 	memset(this, 0, sizeof(AudioSpecificConfig));
@@ -510,7 +681,17 @@ AudioSpecificConfig::AudioSpecificConfig(ByteReader& data)
 
 	uint16_t u16 = (*data.ReadBytes(1) << 8) | (*data.ReadBytes(1));
 	audioObjectType = (uint8_t)(u16 >> 11); //high 5 bits
+	if (audioObjectType >= MPEG4AudioObjectTypeEscapeValue)
+	{
+		printf("Audio object type is escape value.\n");
+		return;
+	}
 	samplingFrequencyIndex = (uint8_t)((u16 >> 7) & 0x000f); //next 4 bits
+	if (samplingFrequencyIndex >= MPEG4AudioSamplerateWrittenExplictly)
+	{
+		printf("Sampling frequency index is written explictly.\n");
+		return;
+	}
 	channelConfiguration = (uint8_t)((u16 >> 3) & 0x000f); //next 4 bits
 	frameLengthFlag = (uint8_t)((u16 >> 2) & 0x0001); //next 1 bit
 	dependsOnCoreCoder = (uint8_t)((u16 >> 1) & 0x0001); //next 1 bit
@@ -523,7 +704,9 @@ std::string AudioSpecificConfig::Serialize()
 {
 	Json::Value root, aac_config;
 	aac_config["object_type"] = audioObjectType;
+	aac_config["object_type_name"] = GetMPEG4AudioObjectTypeString((MPEG4AudioObjectType)audioObjectType);
 	aac_config["frequency_index"] = samplingFrequencyIndex;
+	aac_config["frequency"] = GetMPEG4AudioSamplerateString((MPEG4AudioSamplerate)samplingFrequencyIndex);
 	aac_config["channel_configuration"] = channelConfiguration;
 	aac_config["frame_length_flag"] = frameLengthFlag;
 	aac_config["depends_on_core_coder"] = dependsOnCoreCoder;
@@ -1132,7 +1315,9 @@ std::string NaluSEI::CompleteInfo()
 
 std::string NaluSEI::ExtraInfo()
 {
-	return seis_to_json(seis_, sei_num_).toStyledString();
+	Json::Value extra_info;
+	extra_info["seis"] = seis_to_json(seis_, sei_num_);
+	return extra_info.toStyledString();
 }
 
 VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)

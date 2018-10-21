@@ -1251,7 +1251,7 @@ void release_seis(sei_t** seis, uint32_t num_seis)
 
 Json::Value seis_to_json(sei_t** seis, uint32_t num_seis)
 {
-	Json::Value root, json_seis;
+	Json::Value json_seis;
 
 	if (!seis || !num_seis)
 		return json_seis;
@@ -1273,6 +1273,5 @@ Json::Value seis_to_json(sei_t** seis, uint32_t num_seis)
 		json_seis.append(json_sei);
 	}
 
-	root["seis"] = json_seis;
-	return root;
+	return json_seis;
 }

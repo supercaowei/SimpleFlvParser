@@ -41,6 +41,21 @@ int main(int argc, char* argv[])
 		}
 	}
 
+	if (!txt_file.empty())
+	{
+		std::shared_ptr<FlvOutputInterface> output = std::make_shared<TextOutput>(txt_file);
+		if (output && output->IsGood())
+		{
+			//get the output callbacks
+			FlvHeaderCallback header_cb = std::bind(&FlvOutputInterface::FlvHeaderOutput, output, std::placeholders::_1);
+			FlvTagCallback tag_cb = std::bind(&FlvOutputInterface::FlvTagOutput, output, std::placeholders::_1);
+			NaluCallback nalu_cb = std::bind(&FlvOutputInterface::NaluOutput, output, std::placeholders::_1);
+
+			//do output
+			flv->Output(header_cb, tag_cb, nalu_cb);
+		}
+	}
+
 	return 0;
 }
 
@@ -71,7 +86,7 @@ int parse_args(int argc, char* argv[])
 			else
 				db_file = argv[++i];
 		}
-		else if (strcmp(argv[i], "-t") == 0)
+		else if (strcmp(argv[i], "-txt") == 0)
 		{
 			if (i + 1 >= argc || argv[i + 1][0] == '-')
 				goto help;
@@ -107,5 +122,5 @@ help:
 void print_help()
 {
 	printf("SimpleFlvParser usage: \n");
-	printf("\tSimpleFlvParser -i <input flv file> [-db <output db file>] [-t <output text file>]\n");
+	printf("\tSimpleFlvParser -i <input flv file> [-db <output db file>] [-txt <output text file>]\n");
 }

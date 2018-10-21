@@ -53,6 +53,7 @@ struct FlvTagHeader
 {
 	FlvTagHeader(ByteReader& data);
 	~FlvTagHeader() = default;
+	static uint32_t LastTagTimestamp;
 
 	FlvTagType tag_type_;
 	uint32_t   tag_data_size_; //not including tag header size
@@ -96,6 +97,7 @@ public:
 	virtual uint32_t TagSize() override;
 	virtual uint32_t Pts() override;
 	virtual uint32_t Dts() override;
+	virtual int      DtsDiff() override;
 	virtual std::string SubType() override;
 	virtual std::string Format() override;
 	virtual std::string ExtraInfo() override;
@@ -106,6 +108,9 @@ private:
 	std::shared_ptr<FlvTagHeader> tag_header_;
 	std::shared_ptr<FlvTagData> tag_data_;
 	bool is_good_ = false;
+
+	static uint32_t LastVideoDts;
+	static uint32_t LastAudioDts;
 };
 
 
@@ -208,6 +213,80 @@ protected:
 	bool is_good_ = false;
 	AudioTagType audio_tag_type_;
 };
+
+enum MPEG4AudioObjectType 
+{
+	MPEG4AudioObjectTypeNull = 0,
+	MPEG4AudioObjectTypeAACMain,
+	MPEG4AudioObjectTypeAACLC, //(Low Complexity)
+	MPEG4AudioObjectTypeAACSSR,//(Scalable Sample Rate)
+	MPEG4AudioObjectTypeAACLTP,//(Long Term Prediction)
+	MPEG4AudioObjectTypeSBR,//(Spectral Band Replication)
+	MPEG4AudioObjectTypeAACScalable,
+	MPEG4AudioObjectTypeTwinVQ,
+	MPEG4AudioObjectTypeCELP,//(Code Excited Linear Prediction)
+	MPEG4AudioObjectTypeHXVC,//(Harmonic Vector eXcitation Coding)
+	MPEG4AudioObjectTypeReserved1,
+	MPEG4AudioObjectTypeReserved2,
+	MPEG4AudioObjectTypeTTSI,//(Text - To - Speech Interface)
+	MPEG4AudioObjectTypeMainSynthesis,
+	MPEG4AudioObjectTypeWavetableSynthesis,
+	MPEG4AudioObjectTypeGeneralMIDI,
+	MPEG4AudioObjectTypeASAE,//(Algorithmic Synthesis and Audio Effects)
+	MPEG4AudioObjectTypeERAACLC,//(Error Resilient) 
+	MPEG4AudioObjectTypeReserved3,
+	MPEG4AudioObjectTypeERAACLTP,
+	MPEG4AudioObjectTypeERAACScalable,
+	MPEG4AudioObjectTypeERTwinVQ,
+	MPEG4AudioObjectTypeERBSAC,//(Bit - Sliced Arithmetic Coding)
+	MPEG4AudioObjectTypeERAACLD,//(Low Delay)
+	MPEG4AudioObjectTypeERCELP,
+	MPEG4AudioObjectTypeERHVXC,
+	MPEG4AudioObjectTypeERHILN,//(Harmonic and Individual Lines plus Noise)
+	MPEG4AudioObjectTypeERParametric,
+	MPEG4AudioObjectTypeSSC,//(SinuSoidal Coding)
+	MPEG4AudioObjectTypePS,//(Parametric Stereo)
+	MPEG4AudioObjectTypeMPEGSurround,
+	MPEG4AudioObjectTypeEscapeValue,
+	MPEG4AudioObjectTypeLayer1,
+	MPEG4AudioObjectTypeLayer2,
+	MPEG4AudioObjectTypeLayer3,
+	MPEG4AudioObjectTypeDST,//(Direct Stream Transfer)
+	MPEG4AudioObjectTypeALS,//(Audio Lossless)
+	MPEG4AudioObjectTypeSLS,//(Scalable LosslesS)
+	MPEG4AudioObjectTypeSLSNonCore,
+	MPEG4AudioObjectTypeERAACELD,//(Enhanced Low Delay)
+	MPEG4AudioObjectTypeSMRSimple,//(Symbolic Music Representation) Simple
+	MPEG4AudioObjectTypeSMRMain,
+	MPEG4AudioObjectTypeUSACNoSBR,//(Unified Speech and Audio Coding) (no SBR)
+	MPEG4AudioObjectTypeSAOC,//(Spatial Audio Object Coding)
+	MPEG4AudioObjectTypeLDMPEGSurround,
+	MPEG4AudioObjectTypeUSAC
+};
+
+std::string GetMPEG4AudioObjectTypeString(MPEG4AudioObjectType type);
+
+enum MPEG4AudioSamplerate
+{
+	MPEG4AudioSamplerate96000Hz,
+	MPEG4AudioSamplerate88200Hz,
+	MPEG4AudioSamplerate64000Hz,
+	MPEG4AudioSamplerate48000Hz,
+	MPEG4AudioSamplerate44100Hz,
+	MPEG4AudioSamplerate32000Hz,
+	MPEG4AudioSamplerate24000Hz,
+	MPEG4AudioSamplerate22050Hz,
+	MPEG4AudioSamplerate16000Hz,
+	MPEG4AudioSamplerate12000Hz,
+	MPEG4AudioSamplerate11025Hz,
+	MPEG4AudioSamplerate8000Hz,
+	MPEG4AudioSamplerate7350Hz,
+	MPEG4AudioSamplerateReserved1,
+	MPEG4AudioSamplerateReserved2,
+	MPEG4AudioSamplerateWrittenExplictly
+};
+
+std::string GetMPEG4AudioSamplerateString(MPEG4AudioSamplerate samplerate);
 
 struct AudioSpecificConfig
 {

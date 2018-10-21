@@ -32,19 +32,20 @@ static const char *SQL_STAT_CREATE_FLV_TAGS_TABLE = \
 		tag_size INTEGER, \
 		pts INTEGER, \
 		dts INTEGER, \
+		dts_diff INTEGER, \
 		sub_type TEXT, \
 		format TEXT, \
 		extra_info VARCHAR(2000))";
 
 static const char *SQL_STAT_INSERT = \
 	"INSERT INTO flv_tags(serial, previous_tag_size, tag_type, stream_id, tag_size, \
-	pts, dts, sub_type, format, extra_info) \
-	VALUES( ? , ? , ? , ? , ? , ? , ? , ? , ? , ? )";
+	pts, dts, dts_diff, sub_type, format, extra_info) \
+	VALUES( ? , ? , ? , ? , ? , ? , ? , ? , ? , ? , ? )";
 
 static const char *SQL_STAT_INSERT_FLV_TAG_FMT = \
 	"INSERT INTO flv_tags(serial, previous_tag_size, tag_type, stream_id, tag_size, \
-	pts, dts, sub_type, format, extra_info) \
-	VALUES( %d , %d , '%s' , %d , %d , %d , %d , '%s' , '%s' , '%s' )\0";
+	pts, dts, dts_diff, sub_type, format, extra_info) \
+	VALUES( %d , %d , '%s' , %d , %d , %d , %d , %d , '%s' , '%s' , '%s' )\0";
 
 static const char *SQL_STAT_CREATE_NALU_TABLE = \
 	"CREATE TABLE IF NOT EXISTS nal_units (\
@@ -73,7 +74,7 @@ DBOutput::DBOutput(const std::string& db_path)
 		remove(db_path.c_str()); //delete the file
 	if (access(db_path.c_str(), 0) == 0)
 	{
-		printf("Database file %s already exists and is occupied now.", db_path.c_str());
+		printf("Database file %s already exists and is occupied now.\n", db_path.c_str());
 		return;
 	}
 
@@ -90,6 +91,7 @@ DBOutput::DBOutput(const std::string& db_path)
 		ret = sqlite3_exec(db_, create_table_sql[i], NULL, NULL, NULL);
 		if (ret != SQLITE_OK)
 		{
+			printf("Execute sentence '%s' error\n", create_table_sql[i]);
 			sqlite3_close(db_);
 			db_ = NULL;
 			return;
@@ -118,9 +120,7 @@ void DBOutput::FlvHeaderOutput(const std::shared_ptr<FlvHeaderInterface>& header
 
 	int ret = sqlite3_exec(db_, buff, NULL, NULL, NULL);
 	if (ret != SQLITE_OK)
-	{
 		assert(false);
-	}
 }
 
 void DBOutput::FlvTagOutput(const std::shared_ptr<FlvTagInterface>& tag)
@@ -162,15 +162,14 @@ void DBOutput::FlvTagOutput(const std::shared_ptr<FlvTagInterface>& tag)
 		tag->TagSize(),
 		tag->Pts(),
 		tag->Dts(),
+		tag->DtsDiff(),
 		tag->SubType().c_str(),
 		tag->Format().c_str(),
 		tag->ExtraInfo().c_str());
 
 	int ret = sqlite3_exec(db_, buff, NULL, NULL, NULL);
 	if (ret != SQLITE_OK)
-	{
 		assert(false);
-	}
 }
 
 void DBOutput::NaluOutput(const std::shared_ptr<NaluInterface>& nalu)
@@ -194,7 +193,5 @@ void DBOutput::NaluOutput(const std::shared_ptr<NaluInterface>& nalu)
 
 	int ret = sqlite3_exec(db_, buff, NULL, NULL, NULL);
 	if (ret != SQLITE_OK)
-	{
 		assert(false);
-	}
 }
