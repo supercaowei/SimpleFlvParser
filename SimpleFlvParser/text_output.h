@@ -20,7 +20,7 @@ public:
 
 private:
 	FILE* txt_file_ = NULL;
-	int nalu_serial = 0;
+	int  nalu_serial_ = 0;
 	bool header_title_printed_ = false;
 	bool tags_title_printed_ = false;
 	bool nalu_title_printed_ = false;

@@ -100,7 +100,7 @@ FlvTagHeader::FlvTagHeader(ByteReader& data)
 	is_good_ = true;
 
 	if (timestamp_ < LastTagTimestamp)
-		printf("Warning: current timestamp %llu is smaller than last timestamp %llu.\n", timestamp_, LastTagTimestamp);
+		printf("Warning: current timestamp %u is smaller than last timestamp %u.\n", timestamp_, LastTagTimestamp);
 	LastTagTimestamp = timestamp_;
 }
 

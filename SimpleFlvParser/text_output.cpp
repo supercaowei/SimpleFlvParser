@@ -22,7 +22,7 @@ TextOutput::TextOutput(const std::string& txt_path)
 
 	txt_file_ = fopen(txt_path.c_str(), "w");
 	if (!txt_file_)
-		printf("Create txt file %s error: %d.\n", txt_path.c_str(), errno);
+		printf("Create txt file %s error.\n", txt_path.c_str());
 }
 
 TextOutput::~TextOutput()
@@ -69,13 +69,14 @@ void TextOutput::NaluOutput(const std::shared_ptr<NaluInterface>& nalu)
 {
 	if (!nalu_title_printed_)
 	{
-		std::string splitter(10 + 1 + 10 + 1 + 11 + 1 + 13 + 1 + 10, '-');
+		std::string splitter(10 + 1 + 10 + 1 + 10 + 1 + 11 + 1 + 13 + 1 + 10, '-');
 		fprintf(txt_file_, "%s\n", splitter.c_str());
-		fprintf(txt_file_, "%10s %10s %11s %13s %10s\n", "tag_belong", "nalu_size", "nal_ref_idc", "nal_unit_type", "slice_type");
+		fprintf(txt_file_, "%10s %10s %10s %11s %13s %10s\n", "nalu_serial", "tag_belong", "nalu_size", "nal_ref_idc", "nal_unit_type", "slice_type");
 		nalu_title_printed_ = true;
 	}
 
-	fprintf(txt_file_, "%10d %10d %11d %13s %10s\n",
+	fprintf(txt_file_, "%10d %10d %10d %11d %13s %10s\n",
+		++nalu_serial_,
 		nalu->TagSerialBelong(),
 		nalu->NaluSize(),
 		nalu->NalRefIdc(),
