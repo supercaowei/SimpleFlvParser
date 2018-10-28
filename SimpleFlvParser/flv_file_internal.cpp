@@ -16,7 +16,10 @@ FlvHeader::FlvHeader(ByteReader& data)
 
 	uint8_t* header_pos = data.ReadBytes(3);
 	if (strncmp((char *)header_pos, "FLV", 3)) //not begin with "FLV"
+	{
+		printf("This is not an FLV file.\n");
 		return;
+	}
 	if (*(header_pos = data.ReadBytes(1)) != 0x01)
 		return;
 	if ((*(header_pos = data.ReadBytes(1)) & 0xfa) != 0)
@@ -229,7 +232,10 @@ std::string FlvTag::ExtraInfo()
 std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type)
 {
 	if (data.RemainingSize() < tag_data_size)
+	{
+		data.ReadBytes(data.RemainingSize());
 		return std::shared_ptr<FlvTagData>(nullptr);
+	}
 
 	ByteReader tag_data(data.ReadBytes(tag_data_size), tag_data_size);
 
