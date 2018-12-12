@@ -779,7 +779,7 @@ uint32_t FlvTagDataVideo::GetCts()
 std::string FlvTagDataVideo::GetSubTypeString()
 {
 	if (video_tag_body_)
-		return GetVideoTagTypeString(video_tag_body_->GetVideoTagType());
+		return GetVideoTagTypeString(video_tag_body_->GetVideoTagType(), video_tag_header_->codec_id_);
 	return FlvTagData::GetSubTypeString();
 }
 
@@ -886,16 +886,20 @@ VideoTagHeader::VideoTagHeader(ByteReader& data)
 	is_good_ = true;
 }
 
-std::string GetVideoTagTypeString(VideoTagType type)
+std::string GetVideoTagTypeString(VideoTagType type, FlvVideoCodecID codec_id)
 {
+	if (codec_id != FlvVideoCodeIDAVC && codec_id != FlvVideoCodeIDHEVC)
+		return STRING_UNKNOWN;
+
+	bool is264 = codec_id == FlvVideoCodeIDAVC;
 	switch (type)
 	{
 	case VideoTagTypeAVCSequenceHeader:
-		return "H.264 SPS PPS";
+		return is264 ? "H.264 SPS PPS" : "H.265 VPS SPS PPS";
 	case VideoTagTypeAVCNalu:
-		return "H.264 NAL Units";
+		return is264 ? "H.264 NAL Units" : "H.265 NAL Units";
 	case VideoTagTypeAVCSequenceEnd:
-		return "H.264 Sequence End";
+		return is264 ? "H.264 Sequence End" : "H.265 Sequence End";
 	default:
 		return STRING_UNKNOWN;
 	}
@@ -921,7 +925,10 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 		}
 	}
 	case FlvVideoCodeIDHEVC:
-		return std::make_shared<VideoTagBodyHEVC>(data);
+	{
+		VideoTagType video_tag_type = (VideoTagType)(*data.ReadBytes(1));
+		return std::make_shared<VideoTagBodyHEVC>(data, video_tag_type);
+	}
 	default:
 		return std::make_shared<VideoTagBodyNonAVC>(data);
 	}
@@ -1480,13 +1487,12 @@ VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)
 	is_good_ = true;
 }
 
-VideoTagBodyHEVC::VideoTagBodyHEVC(ByteReader& data)
+VideoTagBodyHEVC::VideoTagBodyHEVC(ByteReader& data, VideoTagType video_tag_type)
 {
 	if (data.RemainingSize() < 3)
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
-
-	video_tag_type_ = VideoTagTypeNonAVC;
+	video_tag_type_ = video_tag_type;
 	is_good_ = true;
 }
 

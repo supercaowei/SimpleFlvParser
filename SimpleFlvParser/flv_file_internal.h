@@ -382,7 +382,7 @@ enum VideoTagType
 	VideoTagTypeAVCSequenceEnd      = 2,  //AVC end of sequence (lower level Nalu sequence ender is not required or supported)
 };
 
-std::string GetVideoTagTypeString(VideoTagType type);
+std::string GetVideoTagTypeString(VideoTagType type, FlvVideoCodecID codec_id);
 
 class VideoTagBody
 {
@@ -590,7 +590,7 @@ private:
 class VideoTagBodyHEVC : public VideoTagBody
 {
 public:
-	VideoTagBodyHEVC(ByteReader& data);
+	VideoTagBodyHEVC(ByteReader& data, VideoTagType video_tag_type);
 	~VideoTagBodyHEVC() {}
 	virtual uint32_t GetCts() override { return cts_; }
 
