@@ -842,6 +842,8 @@ std::string GetFlvVideoCodecIDString(FlvVideoCodecID id)
 		return "Screen Video V2";
 	case FlvVideoCodeIDAVC:
 		return "AVC";
+	case FlvVideoCodeIDHEVC:
+		return "HEVC";
 	default:
 		return STRING_UNKNOWN;
 	}
@@ -875,6 +877,7 @@ VideoTagHeader::VideoTagHeader(ByteReader& data)
 	case FlvVideoCodeIDOn2VP6Alpha:
 	case FlvVideoCodeIDScreenVideoV2:
 	case FlvVideoCodeIDAVC:
+	case FlvVideoCodeIDHEVC:
 		break;
 	default:
 		return;
@@ -917,6 +920,8 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 			return std::shared_ptr<VideoTagBody>(nullptr);
 		}
 	}
+	case FlvVideoCodeIDHEVC:
+		return std::make_shared<VideoTagBodyHEVC>(data);
 	default:
 		return std::make_shared<VideoTagBodyNonAVC>(data);
 	}
@@ -1472,6 +1477,16 @@ VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 	video_tag_type_ = VideoTagTypeAVCSequenceEnd;
+	is_good_ = true;
+}
+
+VideoTagBodyHEVC::VideoTagBodyHEVC(ByteReader& data)
+{
+	if (data.RemainingSize() < 3)
+		return;
+	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
+
+	video_tag_type_ = VideoTagTypeNonAVC;
 	is_good_ = true;
 }
 

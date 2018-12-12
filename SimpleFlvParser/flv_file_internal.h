@@ -359,6 +359,7 @@ enum FlvVideoCodecID
 	FlvVideoCodeIDOn2VP6Alpha       = 5, //On2 VP6 with alpha channel
 	FlvVideoCodeIDScreenVideoV2     = 6, //Screen video version 2
 	FlvVideoCodeIDAVC               = 7, //AVC
+	FlvVideoCodeIDHEVC              = 12, //HEVC
 };
 
 std::string GetFlvVideoFrameTypeString(FlvVideoFrameType type);
@@ -581,6 +582,17 @@ class VideoTagBodySequenceEnd : public VideoTagBody
 public:
 	VideoTagBodySequenceEnd(ByteReader& data);
 	virtual uint32_t GetCts() { return cts_; }
+
+private:
+	uint32_t cts_ = 0;
+};
+
+class VideoTagBodyHEVC : public VideoTagBody
+{
+public:
+	VideoTagBodyHEVC(ByteReader& data);
+	~VideoTagBodyHEVC() {}
+	virtual uint32_t GetCts() override { return cts_; }
 
 private:
 	uint32_t cts_ = 0;
