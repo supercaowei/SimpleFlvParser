@@ -1,11 +1,15 @@
 #include "demux_to_file.h"
 
+#ifdef _WIN32
+#pragma warning(disable: 4996)
+#endif
+
 DemuxToFile::DemuxToFile(const std::string& video_file_path, const std::string& audio_file_path)
 {
 	if (!video_file_path.empty())
-		video_file_ = fopen(video_file_path.c_str(), "w");
+		video_file_ = fopen(video_file_path.c_str(), "wb");
 	if (!audio_file_path.empty())
-		audio_file_ = fopen(audio_file_path.c_str(), "w");
+		audio_file_ = fopen(audio_file_path.c_str(), "wb");
 }
 
 DemuxToFile::~DemuxToFile()
