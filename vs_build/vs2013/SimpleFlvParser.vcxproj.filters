@@ -9,6 +9,7 @@
     <ClCompile Include="..\..\SimpleFlvParser\flv_file_internal.cpp" />
     <ClCompile Include="..\..\SimpleFlvParser\amf.c" />
     <ClCompile Include="..\..\SimpleFlvParser\h264_syntax.cpp" />
+    <ClCompile Include="..\..\SimpleFlvParser\demux_to_file.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\SimpleFlvParser\utils.h" />
@@ -22,5 +23,7 @@
     <ClInclude Include="..\..\SimpleFlvParser\amf.h" />
     <ClInclude Include="..\..\SimpleFlvParser\h264_syntax.h" />
     <ClInclude Include="..\..\SimpleFlvParser\input_interface.h" />
+    <ClInclude Include="..\..\SimpleFlvParser\demux_to_file.h" />
+    <ClInclude Include="..\..\SimpleFlvParser\demux_interface.h" />
   </ItemGroup>
 </Project>

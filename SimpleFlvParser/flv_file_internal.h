@@ -2,6 +2,7 @@
 #define _SFP_FLV_FILE_INTERNAL_H_
 
 #include "input_interface.h"
+#include "demux_interface.h"
 #include "bytes.h"
 #include "amf.h"
 #include "utils.h"
@@ -65,7 +66,7 @@ struct FlvTagHeader
 class FlvTagData
 {
 public:
-	static std::shared_ptr<FlvTagData> Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type);
+	static std::shared_ptr<FlvTagData> Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~FlvTagData() {}
 	virtual bool IsGood() { return is_good_; }
 	virtual void SetTagSerial(int tag_serial) {}
@@ -85,7 +86,7 @@ protected:
 class FlvTag : public FlvTagInterface
 {
 public:
-	FlvTag(ByteReader& data, int tag_serial);
+	FlvTag(ByteReader& data, int tag_serial, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	bool IsGood() { return is_good_; }
 	NaluList EnumNalus();
 
@@ -200,7 +201,7 @@ struct AudioTagHeader
 class AudioTagBody
 {
 public:
-	static std::shared_ptr<AudioTagBody> Create(ByteReader& data, AudioFormat audio_format);
+	static std::shared_ptr<AudioTagBody> Create(ByteReader& data, AudioFormat audio_format, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~AudioTagBody() {}
 	virtual bool IsGood() { return is_good_; }
 	virtual std::string GetExtraInfo() { return ""; }
@@ -305,7 +306,7 @@ struct AudioSpecificConfig
 class AudioTagBodyAACConfig : public AudioTagBody
 {
 public:
-	AudioTagBodyAACConfig(ByteReader& data);
+	AudioTagBodyAACConfig(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual std::string GetExtraInfo() override;
 
 private:
@@ -315,7 +316,7 @@ private:
 class AudioTagBodyAACData : public AudioTagBody
 {
 public:
-	AudioTagBodyAACData(ByteReader& data);
+	AudioTagBodyAACData(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 };
 
 class AudioTagBodyNonAAC : public AudioTagBody
@@ -327,7 +328,7 @@ public:
 class FlvTagDataAudio : public FlvTagData
 {
 public:
-	FlvTagDataAudio(ByteReader& data);
+	FlvTagDataAudio(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 
 	virtual std::string GetSubTypeString() override;
 	virtual std::string GetFormatString() override;
@@ -387,7 +388,7 @@ std::string GetVideoTagTypeString(VideoTagType type, FlvVideoCodecID codec_id);
 class VideoTagBody
 {
 public:
-	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodecID codec_id);
+	static std::shared_ptr<VideoTagBody> Create(ByteReader& data, FlvVideoCodecID codec_id, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~VideoTagBody() {}
 	virtual bool IsGood() { return is_good_; }
 	virtual void SetTagSerial(int tag_serial) {}
@@ -437,8 +438,8 @@ struct NaluHeader
 class NaluBase : public NaluInterface
 {
 public:
-	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint8_t nalu_len_size);
-	NaluBase(ByteReader& data, uint8_t nalu_len_size);
+	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~NaluBase();
 	bool IsGood() { return is_good_; }
 	bool IsNoBother() { return no_bother; }
@@ -481,7 +482,7 @@ protected:
 class NaluSps : public NaluBase
 {
 public:
-	NaluSps(ByteReader& data, uint8_t nalu_len_size);
+	NaluSps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	std::shared_ptr<sps_t> sps_;
 
 	virtual std::string CompleteInfo() override;
@@ -491,7 +492,7 @@ public:
 class NaluPps : public NaluBase
 {
 public:
-	NaluPps(ByteReader& data, uint8_t nalu_len_size);
+	NaluPps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	std::shared_ptr<pps_t> pps_;
 
 	virtual std::string CompleteInfo() override;
@@ -501,7 +502,7 @@ public:
 class NaluSlice : public NaluBase
 {
 public:
-	NaluSlice(ByteReader& data, uint8_t nalu_len_size);
+	NaluSlice(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 
 	virtual std::string CompleteInfo() override;
 	virtual int8_t FirstMbInSlice() override;
@@ -520,7 +521,7 @@ private:
 class NaluSEI : public NaluBase
 {
 public:
-	NaluSEI(ByteReader& data, uint8_t nalu_len_size);
+	NaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~NaluSEI();
 
 	virtual std::string CompleteInfo() override;
@@ -534,7 +535,7 @@ private:
 class VideoTagBodyAVCNalu : public VideoTagBody
 {
 public:
-	VideoTagBodyAVCNalu(ByteReader& data);
+	VideoTagBodyAVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~VideoTagBodyAVCNalu() {}
 	virtual void SetTagSerial(int tag_serial) override;
 	virtual uint32_t GetCts() override { return cts_; }
@@ -559,13 +560,13 @@ struct AVCDecoderConfigurationRecord
 	std::shared_ptr<NaluBase> pps_nal_;
 	bool is_good_;
 
-	AVCDecoderConfigurationRecord(ByteReader& data);
+	AVCDecoderConfigurationRecord(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 };
 
 class VideoTagBodySpsPps : public VideoTagBody
 {
 public:
-	VideoTagBodySpsPps(ByteReader& data);
+	VideoTagBodySpsPps(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~VideoTagBodySpsPps() {}
 	virtual void SetTagSerial(int tag_serial) override;
 	virtual uint32_t GetCts() override { return cts_; }
@@ -587,17 +588,6 @@ private:
 	uint32_t cts_ = 0;
 };
 
-class VideoTagBodyHEVC : public VideoTagBody
-{
-public:
-	VideoTagBodyHEVC(ByteReader& data, VideoTagType video_tag_type);
-	~VideoTagBodyHEVC() {}
-	virtual uint32_t GetCts() override { return cts_; }
-
-private:
-	uint32_t cts_ = 0;
-};
-
 class VideoTagBodyNonAVC : public VideoTagBody
 {
 public:
@@ -607,7 +597,7 @@ public:
 class FlvTagDataVideo : public FlvTagData
 {
 public:
-	FlvTagDataVideo(ByteReader& data);
+	FlvTagDataVideo(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~FlvTagDataVideo() {}
 
 	virtual void SetTagSerial(int tag_serial) override;
@@ -622,6 +612,159 @@ private:
 	std::shared_ptr<VideoTagBody> video_tag_body_;
 };
 
+
+
+//////////////////////////////////////////////////////////////////////////
+//HEVC
+
+enum HevcNaluType
+{
+	HevcNaluTypeUnknown = -1,
+	HevcNaluTypeCodedSliceTrailN = 0, // 0
+	HevcNaluTypeCodedSliceTrailR,	  // 1
+	HevcNaluTypeCodedSliceTSAN,		  // 2
+	HevcNaluTypeCodedSliceTLA,		  // 3   // Current name in the spec: TSA_R
+	HevcNaluTypeCodedSliceSTSAN,	  // 4
+	HevcNaluTypeCodedSliceSTSAR,	  // 5
+	HevcNaluTypeCodedSliceRADLN,	  // 6
+	HevcNaluTypeCodedSliceDLP,		  // 7 // Current name in the spec: RADL_R
+	HevcNaluTypeCodedSliceRASLN,	  // 8
+	HevcNaluTypeCodedSliceTFD,		  // 9 // Current name in the spec: RASL_R
+
+	HevcNaluTypeReserved10,
+	HevcNaluTypeReserved11,
+	HevcNaluTypeReserved12,
+	HevcNaluTypeReserved13,
+	HevcNaluTypeReserved14,
+	HevcNaluTypeReserved15,
+
+	HevcNaluTypeCodedSliceBLA,	   // 16   // Current name in the spec: BLA_W_LP
+	HevcNaluTypeCodedSliceBLANT,	   // 17   // Current name in the spec: BLA_W_DLP
+	HevcNaluTypeCodedSliceBLANLP, // 18
+	HevcNaluTypeCodedSliceIDR,	   // 19  // Current name in the spec: IDR_W_DLP
+	HevcNaluTypeCodedSliceIDRNLP, // 20
+	HevcNaluTypeCodedSliceCRA,	   // 21
+
+	HevcNaluTypeReserved22,
+	HevcNaluTypeReserved23,
+	HevcNaluTypeReserved24,
+	HevcNaluTypeReserved25,
+	HevcNaluTypeReserved26,
+	HevcNaluTypeReserved27,
+	HevcNaluTypeReserved28,
+	HevcNaluTypeReserved29,
+	HevcNaluTypeReserved30,
+	HevcNaluTypeReserved31,
+
+	HevcNaluTypeVPS,					// 32
+	HevcNaluTypeSPS,					// 33
+	HevcNaluTypePPS,					// 34
+	HevcNaluTypeAccessUnitDelimiter, // 35
+	HevcNaluTypeEOS,					// 36
+	HevcNaluTypeEOB,					// 37
+	HevcNaluTypeFillerData,			// 38
+	HevcNaluTypeSEI,					// 39 Prefix SEI
+	HevcNaluTypeSEISuffix,			// 40 Suffix SEI
+	HevcNaluTypeReserved41,
+	HevcNaluTypeReserved42,
+	HevcNaluTypeReserved43,
+	HevcNaluTypeReserved44,
+	HevcNaluTypeReserved45,
+	HevcNaluTypeReserved46,
+	HevcNaluTypeReserved47,
+	HevcNaluTypeUnspecified48,
+	HevcNaluTypeUnspecified49,
+	HevcNaluTypeUnspecified50,
+	HevcNaluTypeUnspecified51,
+	HevcNaluTypeUnspecified52,
+	HevcNaluTypeUnspecified53,
+	HevcNaluTypeUnspecified54,
+	HevcNaluTypeUnspecified55,
+	HevcNaluTypeUnspecified56,
+	HevcNaluTypeUnspecified57,
+	HevcNaluTypeUnspecified58,
+	HevcNaluTypeUnspecified59,
+	HevcNaluTypeUnspecified60,
+	HevcNaluTypeUnspecified61,
+	HevcNaluTypeUnspecified62,
+	HevcNaluTypeUnspecified63,
+	HevcNaluTypeInvalid,
+};
+
+std::string GetHevcNaluTypeString(HevcNaluType type);
+
+struct HevcNaluHeader
+{
+	HevcNaluType nal_unit_type_;
+	HevcNaluHeader(uint16_t b);
+};
+
+class HevcNaluBase : public NaluInterface
+{
+public:
+	HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	virtual ~HevcNaluBase() {}
+	bool IsGood() { return is_good_; }
+	void SetTagSerialBelong(int tag_serial_belong) { tag_serial_belong_ = tag_serial_belong; }
+	const std::shared_ptr<HevcNaluHeader>& GetHevcNaluHeader() { return nalu_header_; }
+	virtual std::string CompleteInfo();
+
+	virtual int TagSerialBelong() override;
+	virtual uint32_t NaluSize() override;
+	virtual uint8_t NalRefIdc() override;
+	virtual std::string NalUnitType() override;
+	virtual int8_t FirstMbInSlice() override;
+	virtual std::string SliceType() override;
+	virtual int PicParameterSetId() override;
+	virtual int FrameNum() override;
+	virtual int FieldPicFlag() override;
+	virtual int PicOrderCntLsb() override;
+	virtual int SliceQpDelta() override;
+	virtual std::string ExtraInfo() override;
+
+protected:
+	int tag_serial_belong_ = -1;
+	uint32_t nalu_size_ = 0;
+	std::shared_ptr<HevcNaluHeader> nalu_header_;
+	bool is_good_ = false;
+};
+
+class VideoTagBodyHEVCNalu : public VideoTagBody
+{
+public:
+	VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	~VideoTagBodyHEVCNalu() {}
+	virtual void SetTagSerial(int tag_serial) override;
+	virtual uint32_t GetCts() override { return cts_; }
+	virtual NaluList EnumNalus() override;
+	virtual std::string GetExtraInfo() override;
+
+private:
+	uint32_t cts_ = 0;
+	std::list<std::shared_ptr<HevcNaluBase> > nalu_list_;
+};
+
+struct HEVCDecoderConfigurationRecord
+{
+	std::list<std::shared_ptr<HevcNaluBase> > nalu_list_;
+	bool is_good_;
+
+	HEVCDecoderConfigurationRecord(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+};
+
+class VideoTagBodyVpsSpsPps : public VideoTagBody
+{
+public:
+	VideoTagBodyVpsSpsPps(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	~VideoTagBodyVpsSpsPps() {}
+	virtual void SetTagSerial(int tag_serial) override;
+	virtual uint32_t GetCts() override { return cts_; }
+	virtual NaluList EnumNalus() override;
+
+private:
+	uint32_t cts_ = 0;
+	std::shared_ptr<HEVCDecoderConfigurationRecord> hevc_config_;
+};
 
 
 #endif

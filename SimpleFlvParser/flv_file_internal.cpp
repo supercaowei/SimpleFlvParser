@@ -110,7 +110,7 @@ FlvTagHeader::FlvTagHeader(ByteReader& data)
 uint32_t FlvTag::LastVideoDts = 0;
 uint32_t FlvTag::LastAudioDts = 0;
 
-FlvTag::FlvTag(ByteReader& data, int tag_serial)
+FlvTag::FlvTag(ByteReader& data, int tag_serial, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < PREVIOUS_TAG_SIZE_SIZE + FLV_TAG_HEADER_SIZE)
 	{
@@ -129,7 +129,7 @@ FlvTag::FlvTag(ByteReader& data, int tag_serial)
 			data.ReadBytes(data.RemainingSize());
 		return;
 	}
-	tag_data_ = FlvTagData::Create(data, tag_header_->tag_data_size_, tag_header_->tag_type_);
+	tag_data_ = FlvTagData::Create(data, tag_header_->tag_data_size_, tag_header_->tag_type_, demux_output);
 	if (!tag_data_ || !tag_data_->IsGood())
 		return;
 	tag_data_->SetTagSerial(tag_serial_);
@@ -229,7 +229,7 @@ std::string FlvTag::ExtraInfo()
 	return "";
 }
 
-std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type)
+std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_data_size, FlvTagType tag_type, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < tag_data_size)
 	{
@@ -242,9 +242,9 @@ std::shared_ptr<FlvTagData> FlvTagData::Create(ByteReader& data, uint32_t tag_da
 	switch (tag_type)
 	{
 	case FlvTagTypeAudio:
-		return std::make_shared<FlvTagDataAudio>(tag_data);
+		return std::make_shared<FlvTagDataAudio>(tag_data, demux_output);
 	case FlvTagTypeVideo:
-		return std::make_shared<FlvTagDataVideo>(tag_data);
+		return std::make_shared<FlvTagDataVideo>(tag_data, demux_output);
 	case FlvTagTypeScriptData:
 		return std::make_shared<FlvTagDataScript>(tag_data);
 	default:
@@ -322,13 +322,13 @@ void FlvTagDataScript::DecodeAMF(const AMFObject* amf, Json::Value& json)
 	}
 }
 
-FlvTagDataAudio::FlvTagDataAudio(ByteReader& data)
+FlvTagDataAudio::FlvTagDataAudio(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	audio_tag_header_ = std::make_shared<AudioTagHeader>(data);
 	if (!audio_tag_header_ || !audio_tag_header_->is_good_)
 		return;
 
-	audio_tag_body_ = AudioTagBody::Create(data, audio_tag_header_->audio_format_);
+	audio_tag_body_ = AudioTagBody::Create(data, audio_tag_header_->audio_format_, demux_output);
 	if (!audio_tag_body_ || !audio_tag_body_->IsGood())
 		return;
 
@@ -518,7 +518,7 @@ std::string GetAudioTagTypeString(AudioTagType type)
 	}
 }
 
-std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat audio_format)
+std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat audio_format, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	switch (audio_format)
 	{
@@ -526,9 +526,9 @@ std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat
 	{
 		uint8_t b = *data.ReadBytes(1);
 		if (b == AudioTagTypeAACConfig)
-			return std::make_shared<AudioTagBodyAACConfig>(data);
+			return std::make_shared<AudioTagBodyAACConfig>(data, demux_output);
 		else if (b == AudioTagTypeAACData)
-			return std::make_shared<AudioTagBodyAACData>(data);
+			return std::make_shared<AudioTagBodyAACData>(data, demux_output);
 		else
 			return std::shared_ptr<AudioTagBody>(nullptr);
 	}
@@ -721,8 +721,11 @@ std::string AudioSpecificConfig::Serialize()
 	return root.toStyledString();
 }
 
-AudioTagBodyAACConfig::AudioTagBodyAACConfig(ByteReader& data)
+AudioTagBodyAACConfig::AudioTagBodyAACConfig(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
+	if (demux_output)
+		demux_output->OnAudioAACData(data.CurrentPos(), 2);
+
 	aac_config_ = std::make_shared<AudioSpecificConfig>(data);
 	if (!aac_config_ || !aac_config_->is_good_)
 		return;
@@ -738,8 +741,11 @@ std::string AudioTagBodyAACConfig::GetExtraInfo()
 	return "";
 }
 
-AudioTagBodyAACData::AudioTagBodyAACData(ByteReader& data)
+AudioTagBodyAACData::AudioTagBodyAACData(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
+	if (demux_output)
+		demux_output->OnAudioAACData(data.CurrentPos(), data.RemainingSize());
+
 	audio_tag_type_ = AudioTagTypeAACData;
 	is_good_ = true;
 }
@@ -750,13 +756,13 @@ AudioTagBodyNonAAC::AudioTagBodyNonAAC(ByteReader& data)
 	is_good_ = true;
 }
 
-FlvTagDataVideo::FlvTagDataVideo(ByteReader& data)
+FlvTagDataVideo::FlvTagDataVideo(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	video_tag_header_ = std::make_shared<VideoTagHeader>(data);
 	if (!video_tag_header_ || !video_tag_header_->is_good_)
 		return;
 
-	video_tag_body_ = VideoTagBody::Create(data, video_tag_header_->codec_id_);
+	video_tag_body_ = VideoTagBody::Create(data, video_tag_header_->codec_id_, demux_output);
 	if (!video_tag_body_ || !video_tag_body_->IsGood())
 		return;
 
@@ -905,7 +911,7 @@ std::string GetVideoTagTypeString(VideoTagType type, FlvVideoCodecID codec_id)
 	}
 }
 
-std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCodecID codec_id)
+std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCodecID codec_id, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	switch (codec_id)
 	{
@@ -915,9 +921,9 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 		switch (b)
 		{
 		case VideoTagTypeAVCSequenceHeader:
-			return std::make_shared<VideoTagBodySpsPps>(data);
+			return std::make_shared<VideoTagBodySpsPps>(data, demux_output);
 		case VideoTagTypeAVCNalu:
-			return std::make_shared<VideoTagBodyAVCNalu>(data);
+			return std::make_shared<VideoTagBodyAVCNalu>(data, demux_output);
 		case VideoTagTypeAVCSequenceEnd:
 			return std::make_shared<VideoTagBodySequenceEnd>(data);
 		default:
@@ -926,8 +932,18 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 	}
 	case FlvVideoCodeIDHEVC:
 	{
-		VideoTagType video_tag_type = (VideoTagType)(*data.ReadBytes(1));
-		return std::make_shared<VideoTagBodyHEVC>(data, video_tag_type);
+		uint8_t b = *data.ReadBytes(1);
+		switch (b)
+		{
+		case VideoTagTypeAVCSequenceHeader:
+			return std::make_shared<VideoTagBodyVpsSpsPps>(data, demux_output);
+		case VideoTagTypeAVCNalu:
+			return std::make_shared<VideoTagBodyHEVCNalu>(data, demux_output);
+		case VideoTagTypeAVCSequenceEnd:
+			return std::make_shared<VideoTagBodySequenceEnd>(data);
+		default:
+			return std::shared_ptr<VideoTagBody>(nullptr);
+		}
 	}
 	default:
 		return std::make_shared<VideoTagBodyNonAVC>(data);
@@ -981,7 +997,7 @@ NaluHeader::NaluHeader(uint8_t b)
 
 std::shared_ptr<NaluBase> NaluBase::CurrentSps = std::shared_ptr<NaluBase>(nullptr);
 std::shared_ptr<NaluBase> NaluBase::CurrentPps = std::shared_ptr<NaluBase>(nullptr);
-std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_size)
+std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	NaluType nalu_type = GetNaluType(data, nalu_len_size);
 
@@ -990,24 +1006,24 @@ std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_si
 	case NaluTypeNonIDR:
 	case NaluTypeIDR:
 	case NaluTypeSliceAux:
-		return std::make_shared<NaluSlice>(data, nalu_len_size);
+		return std::make_shared<NaluSlice>(data, nalu_len_size, demux_output);
 	case NaluTypeSEI:
-		return std::make_shared<NaluSEI>(data, nalu_len_size);
+		return std::make_shared<NaluSEI>(data, nalu_len_size, demux_output);
 	case NaluTypeSPS:
-		CurrentSps = std::make_shared<NaluSps>(data, nalu_len_size);
+		CurrentSps = std::make_shared<NaluSps>(data, nalu_len_size, demux_output);
 		return CurrentSps;
 	case NaluTypePPS:
-		CurrentPps = std::make_shared<NaluPps>(data, nalu_len_size);
+		CurrentPps = std::make_shared<NaluPps>(data, nalu_len_size, demux_output);
 		return CurrentPps;
 	default:
-		return std::make_shared<NaluBase>(data, nalu_len_size);
+		return std::make_shared<NaluBase>(data, nalu_len_size, demux_output);
 	}
 }
 
-NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size)
+NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
-	// In sps and pps, it's 2. In IDR, p, b frames and SEI nalu, it's 4.
+	// In AVCDecoderConfigurationRecord, it's 2. In AVC data, it's 4.
 	if (nalu_len_size > 4) 
 		return;
 	if (data.RemainingSize() < nalu_len_size)
@@ -1017,6 +1033,13 @@ NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size)
 	{
 		data.ReadBytes(data.RemainingSize());
 		return;
+	}
+
+	if (demux_output)
+	{
+		static const uint8_t start_code[] = { 0x00, 0x00, 0x00, 0x01 };
+		demux_output->OnVideoNaluData(start_code, 4);
+		demux_output->OnVideoNaluData(data.CurrentPos(), nalu_size_);
 	}
 
 	//parse nalu header
@@ -1144,8 +1167,8 @@ std::string NaluBase::ExtraInfo()
 	return "";
 }
 
-NaluSps::NaluSps(ByteReader& data, uint8_t nalu_len_size)
-	: NaluBase(data, nalu_len_size)
+NaluSps::NaluSps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_len_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1178,8 +1201,8 @@ std::string NaluSps::ExtraInfo()
 	return "";
 }
 
-NaluPps::NaluPps(ByteReader& data, uint8_t nalu_len_size)
-	: NaluBase(data, nalu_len_size)
+NaluPps::NaluPps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_len_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1212,8 +1235,8 @@ std::string NaluPps::ExtraInfo()
 	return "";
 }
 
-NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size)
-	: NaluBase(data, nalu_len_size)
+NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_len_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1299,8 +1322,8 @@ std::string NaluSlice::ExtraInfo()
 	return "";
 }
 
-NaluSEI::NaluSEI(ByteReader& data, uint8_t nalu_len_size)
-	: NaluBase(data, nalu_len_size)
+NaluSEI::NaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_len_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1338,7 +1361,7 @@ std::string NaluSEI::ExtraInfo()
 	return extra_info.toStyledString();
 }
 
-VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)
+VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < 3)
 		return;
@@ -1346,7 +1369,7 @@ VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data)
 
 	while (data.RemainingSize())
 	{
-		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, 4);
+		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, 4, demux_output);
 		if (!nalu || !nalu->IsNoBother())
 			break;
 		else if (!nalu->IsGood())
@@ -1388,7 +1411,7 @@ std::string VideoTagBodyAVCNalu::GetExtraInfo()
 	return root.toStyledString();
 }
 
-AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
+AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	memset(this, 0, sizeof(AVCDecoderConfigurationRecord));
 	if (data.RemainingSize() < 8)
@@ -1404,7 +1427,7 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
 	numOfSequenceParameterSets = *data.ReadBytes(1);
 	if ((numOfSequenceParameterSets & 0x1F) != 1) //Only 1 sps, says Adobe
 		return;
-	sps_nal_ = NaluBase::Create(data, 2);
+	sps_nal_ = NaluBase::Create(data, 2, demux_output);
 	if (!sps_nal_ || !sps_nal_->IsGood())
 		return;
 
@@ -1414,19 +1437,19 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data)
 	numOfPictureParameterSets = *data.ReadBytes(1);
 	if (numOfPictureParameterSets != 1) //Only 1 pps, says Adobe
 		return;
-	pps_nal_ = NaluBase::Create(data, 2);
+	pps_nal_ = NaluBase::Create(data, 2, demux_output);
 	if (!pps_nal_ || !pps_nal_->IsGood())
 		return;
 
 	is_good_ = true;
 }
 
-VideoTagBodySpsPps::VideoTagBodySpsPps(ByteReader& data)
+VideoTagBodySpsPps::VideoTagBodySpsPps(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < 3)
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
-	avc_config_ = std::make_shared<AVCDecoderConfigurationRecord>(data);
+	avc_config_ = std::make_shared<AVCDecoderConfigurationRecord>(data, demux_output);
 	if (!avc_config_ || !avc_config_->is_good_)
 		return;
 
@@ -1487,17 +1510,343 @@ VideoTagBodySequenceEnd::VideoTagBodySequenceEnd(ByteReader& data)
 	is_good_ = true;
 }
 
-VideoTagBodyHEVC::VideoTagBodyHEVC(ByteReader& data, VideoTagType video_tag_type)
-{
-	if (data.RemainingSize() < 3)
-		return;
-	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
-	video_tag_type_ = video_tag_type;
-	is_good_ = true;
-}
-
 VideoTagBodyNonAVC::VideoTagBodyNonAVC(ByteReader& data)
 {
 	video_tag_type_ = VideoTagTypeNonAVC;
 	is_good_ = true;
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+//HEVC
+
+std::string GetHevcNaluTypeString(HevcNaluType type)
+{
+	switch (type)
+	{
+	case HevcNaluTypeCodedSliceTrailN:
+		return "CodedSliceTrailN";
+	case HevcNaluTypeCodedSliceTrailR:
+		return "CodedSliceTrailR";
+	case HevcNaluTypeCodedSliceTSAN:
+		return "CodedSliceTSAN";
+	case HevcNaluTypeCodedSliceTLA:
+		return "CodedSliceTLA";
+	case HevcNaluTypeCodedSliceSTSAN:
+		return "CodedSliceSTSAN";
+	case HevcNaluTypeCodedSliceSTSAR:
+		return "CodedSliceSTSAR";
+	case HevcNaluTypeCodedSliceRADLN:
+		return "CodedSliceRADLN";
+	case HevcNaluTypeCodedSliceDLP:
+		return "CodedSliceDLP";
+	case HevcNaluTypeCodedSliceRASLN:
+		return "CodedSliceRASLN";
+	case HevcNaluTypeCodedSliceTFD:
+		return "CodedSliceTFD";
+	case HevcNaluTypeReserved10:
+		return "Reserved10";
+	case HevcNaluTypeReserved11:
+		return "Reserved11";
+	case HevcNaluTypeReserved12:
+		return "Reserved12";
+	case HevcNaluTypeReserved13:
+		return "Reserved13";
+	case HevcNaluTypeReserved14:
+		return "Reserved14";
+	case HevcNaluTypeReserved15:
+		return "Reserved15";
+	case HevcNaluTypeCodedSliceBLA:
+		return "CodedSliceBLA";
+	case HevcNaluTypeCodedSliceBLANT:
+		return "CodedSliceBLANT";
+	case HevcNaluTypeCodedSliceBLANLP:
+		return "CodedSliceBLANLP";
+	case HevcNaluTypeCodedSliceIDR:
+		return "CodedSliceIDR";
+	case HevcNaluTypeCodedSliceIDRNLP:
+		return "CodedSliceIDRNLP";
+	case HevcNaluTypeCodedSliceCRA:
+		return "CodedSliceCRA";
+	case HevcNaluTypeReserved22:
+		return "Reserved22";
+	case HevcNaluTypeReserved23:
+		return "Reserved23";
+	case HevcNaluTypeReserved24:
+		return "Reserved24";
+	case HevcNaluTypeReserved25:
+		return "Reserved25";
+	case HevcNaluTypeReserved26:
+		return "Reserved26";
+	case HevcNaluTypeReserved27:
+		return "Reserved27";
+	case HevcNaluTypeReserved28:
+		return "Reserved28";
+	case HevcNaluTypeReserved29:
+		return "Reserved29";
+	case HevcNaluTypeReserved30:
+		return "Reserved30";
+	case HevcNaluTypeReserved31:
+		return "Reserved31";
+	case HevcNaluTypeVPS:
+		return "VPS";
+	case HevcNaluTypeSPS:
+		return "SPS";
+	case HevcNaluTypePPS:
+		return "PPS";
+	case HevcNaluTypeAccessUnitDelimiter:
+		return "AccessUnitDelimiter";
+	case HevcNaluTypeEOS:
+		return "EOS";
+	case HevcNaluTypeEOB:
+		return "EOB";
+	case HevcNaluTypeFillerData:
+		return "FillerData";
+	case HevcNaluTypeSEI:
+		return "SEI";
+	case HevcNaluTypeSEISuffix:
+		return "SEISuffix";
+	case HevcNaluTypeReserved41:
+		return "Reserved41";
+	case HevcNaluTypeReserved42:
+		return "Reserved42";
+	case HevcNaluTypeReserved43:
+		return "Reserved43";
+	case HevcNaluTypeReserved44:
+		return "Reserved44";
+	case HevcNaluTypeReserved45:
+		return "Reserved45";
+	case HevcNaluTypeReserved46:
+		return "Reserved46";
+	case HevcNaluTypeReserved47:
+		return "Reserved47";
+	case HevcNaluTypeUnspecified48:
+		return "Unspecified48";
+	case HevcNaluTypeUnspecified49:
+		return "Unspecified49";
+	case HevcNaluTypeUnspecified50:
+		return "Unspecified50";
+	case HevcNaluTypeUnspecified51:
+		return "Unspecified51";
+	case HevcNaluTypeUnspecified52:
+		return "Unspecified52";
+	case HevcNaluTypeUnspecified53:
+		return "Unspecified53";
+	case HevcNaluTypeUnspecified54:
+		return "Unspecified54";
+	case HevcNaluTypeUnspecified55:
+		return "Unspecified55";
+	case HevcNaluTypeUnspecified56:
+		return "Unspecified56";
+	case HevcNaluTypeUnspecified57:
+		return "Unspecified57";
+	case HevcNaluTypeUnspecified58:
+		return "Unspecified58";
+	case HevcNaluTypeUnspecified59:
+		return "Unspecified59";
+	case HevcNaluTypeUnspecified60:
+		return "Unspecified60";
+	case HevcNaluTypeUnspecified61:
+		return "Unspecified61";
+	case HevcNaluTypeUnspecified62:
+		return "Unspecified62";
+	case HevcNaluTypeUnspecified63:
+		return "Unspecified63";
+	case HevcNaluTypeInvalid:
+		return "Invalid";
+	default:
+		return STRING_UNKNOWN;
+	}
+}
+
+HevcNaluHeader::HevcNaluHeader(uint16_t b)
+{
+	nal_unit_type_ = (HevcNaluType)((b >> 9) & 0x3F);
+}
+
+HevcNaluBase::HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+{
+	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
+	// In vps sps and pps, it's 2. In IDR, p, b frames and SEI nalu, it's 4.
+	if (nalu_len_size > 4)
+		return;
+	if (data.RemainingSize() < nalu_len_size)
+		return;
+	nalu_size_ = (uint32_t)BytesToInt(data.ReadBytes(nalu_len_size), nalu_len_size);
+	if (data.RemainingSize() < nalu_size_)
+	{
+		data.ReadBytes(data.RemainingSize());
+		return;
+	}
+
+	if (demux_output)
+	{
+		static const uint8_t start_code[] = { 0x00, 0x00, 0x00, 0x01 };
+		demux_output->OnVideoNaluData(start_code, 4);
+		demux_output->OnVideoNaluData(data.CurrentPos(), nalu_size_);
+	}
+
+	//parse nalu header
+	nalu_header_ = std::make_shared<HevcNaluHeader>((uint16_t)BytesToInt(data.CurrentPos(), 2));
+	data.ReadBytes(nalu_size_);
+
+	is_good_ = true;
+}
+
+std::string HevcNaluBase::CompleteInfo()
+{
+	return "";
+}
+
+int HevcNaluBase::TagSerialBelong()
+{
+	return tag_serial_belong_;
+}
+
+uint32_t HevcNaluBase::NaluSize()
+{
+	return nalu_size_;
+}
+
+uint8_t HevcNaluBase::NalRefIdc()
+{
+	return 0;
+}
+
+std::string HevcNaluBase::NalUnitType()
+{
+	if (nalu_header_)
+		return GetHevcNaluTypeString(nalu_header_->nal_unit_type_);
+	return STRING_UNKNOWN;
+}
+
+int8_t HevcNaluBase::FirstMbInSlice()
+{
+	return 0;
+}
+
+std::string HevcNaluBase::SliceType()
+{
+	return "";
+}
+
+int HevcNaluBase::PicParameterSetId()
+{
+	return 0;
+}
+
+int HevcNaluBase::FrameNum()
+{
+	return 0;
+}
+
+int HevcNaluBase::FieldPicFlag()
+{
+	return 0;
+}
+
+int HevcNaluBase::PicOrderCntLsb()
+{
+	return 0;
+}
+
+int HevcNaluBase::SliceQpDelta()
+{
+	return 0;
+}
+
+std::string HevcNaluBase::ExtraInfo()
+{
+	return "";
+}
+
+VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
+{
+	if (data.RemainingSize() < 3)
+		return;
+	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
+
+	while (data.RemainingSize())
+	{
+		std::shared_ptr<HevcNaluBase> nalu = std::make_shared<HevcNaluBase>(data, 4, demux_output);
+		if (!nalu)
+			break;
+		else if (!nalu->IsGood())
+			continue;
+		nalu_list_.push_back(nalu);
+	}
+	if (nalu_list_.empty())
+		return;
+
+	video_tag_type_ = VideoTagTypeAVCNalu;
+	is_good_ = true;
+}
+
+void VideoTagBodyHEVCNalu::SetTagSerial(int tag_serial)
+{
+	for (const auto& item : nalu_list_)
+		item->SetTagSerialBelong(tag_serial);
+}
+
+NaluList VideoTagBodyHEVCNalu::EnumNalus()
+{
+	NaluList list(nalu_list_.begin(), nalu_list_.end());
+	return list;
+}
+
+std::string VideoTagBodyHEVCNalu::GetExtraInfo()
+{
+	return "";
+}
+
+HEVCDecoderConfigurationRecord::HEVCDecoderConfigurationRecord(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
+{
+	if (data.RemainingSize() < 23)
+		return;
+	data.ReadBytes(22);
+
+	int array_count = *data.ReadBytes(1);
+	for (int i = 0; i < array_count; i++)
+	{
+		data.ReadBytes(1);
+		int nalu_count = (int)BytesToInt(data.ReadBytes(2), 2);
+		for (int j = 0; j < nalu_count; j++)
+		{
+			std::shared_ptr<HevcNaluBase> nalu = std::make_shared<HevcNaluBase>(data, 2, demux_output);
+			nalu_list_.push_back(nalu);
+		}
+	}
+	if (nalu_list_.empty())
+		return;
+
+	is_good_ = true;
+}
+
+VideoTagBodyVpsSpsPps::VideoTagBodyVpsSpsPps(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
+{
+	if (data.RemainingSize() < 3)
+		return;
+	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
+	hevc_config_ = std::make_shared<HEVCDecoderConfigurationRecord>(data, demux_output);
+	if (!hevc_config_ || !hevc_config_->is_good_)
+		return;
+
+	video_tag_type_ = VideoTagTypeAVCSequenceHeader;
+	is_good_ = true;
+}
+
+void VideoTagBodyVpsSpsPps::SetTagSerial(int tag_serial)
+{
+	if (hevc_config_)
+	{
+		for (const auto& item : hevc_config_->nalu_list_)
+			item->SetTagSerialBelong(tag_serial);
+	}
+}
+
+NaluList VideoTagBodyVpsSpsPps::EnumNalus()
+{
+	if (hevc_config_)
+		return NaluList(hevc_config_->nalu_list_.begin(), hevc_config_->nalu_list_.end());
+	return NaluList();
 }

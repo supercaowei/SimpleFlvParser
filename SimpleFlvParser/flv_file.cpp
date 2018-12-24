@@ -6,7 +6,7 @@
 #pragma  warning(disable: 4996)
 #endif
 
-FlvFile::FlvFile(const std::string& flv_path)
+FlvFile::FlvFile(const std::string& flv_path, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	FILE* flv_file = fopen(flv_path.c_str(), "rb");
 	if (!flv_file)
@@ -38,7 +38,7 @@ FlvFile::FlvFile(const std::string& flv_path)
 	int tag_count = 1;
 	while (reader.RemainingSize())
 	{
-		std::shared_ptr<FlvTag> tag = std::make_shared<FlvTag>(reader, tag_count);
+		std::shared_ptr<FlvTag> tag = std::make_shared<FlvTag>(reader, tag_count, demux_output);
 		if (!tag || !tag->IsGood())
 			continue;
 		flv_data_.push_back(tag);

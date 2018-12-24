@@ -2,6 +2,7 @@
 #define _SFP_FLV_FILE_H_
 
 #include "input_interface.h"
+#include "demux_interface.h"
 
 #include <memory>
 #include <string>
@@ -18,7 +19,7 @@ class FlvTag;
 class FlvFile
 {
 public:
-	FlvFile(const std::string& flv_path);
+	FlvFile(const std::string& flv_path, const std::shared_ptr<DemuxInterface>& demux_output);
 	~FlvFile();
 	bool IsGood() { return is_good_; }
 

@@ -5,6 +5,7 @@
 #include "flv_file.h"
 #include "db_output.h"
 #include "text_output.h"
+#include "demux_to_file.h"
 #include "utils.h"
 
 #include <stdio.h>
@@ -14,6 +15,8 @@
 std::string flv_file;
 std::string db_file;
 std::string txt_file;
+std::string h26x_file;
+std::string aac_file;
 
 int main(int argc, char* argv[])
 {
@@ -21,9 +24,13 @@ int main(int argc, char* argv[])
 		return -1;
 
 	std::shared_ptr<FlvFile> flv;
+	std::shared_ptr<DemuxToFile> demux_to_file;
+
+	if (!h26x_file.empty() || !aac_file.empty())
+		demux_to_file = std::make_shared<DemuxToFile>(h26x_file, aac_file);
 
 	//begin parsing flv file
-	flv = std::make_shared<FlvFile>(flv_file);
+	flv = std::make_shared<FlvFile>(flv_file, demux_to_file);
 
 	//open an output
 	if (!db_file.empty())
@@ -93,6 +100,20 @@ int parse_args(int argc, char* argv[])
 			else
 				txt_file = argv[++i];
 		}
+		else if (strcmp(argv[i], "-vcopy") == 0)
+		{
+			if (i + 1 >= argc || argv[i + 1][0] == '-')
+				goto help;
+			else
+				h26x_file = argv[++i];
+		}
+		else if (strcmp(argv[i], "-acopy") == 0)
+		{
+			if (i + 1 >= argc || argv[i + 1][0] == '-')
+				goto help;
+			else
+				aac_file = argv[++i];
+		}
 		else
 		{
 			if (argv[i][0] == '-')
@@ -103,7 +124,7 @@ int parse_args(int argc, char* argv[])
 		}
 	}
 
-	if (flv_file.empty() || (db_file.empty() && txt_file.empty()))
+	if (flv_file.empty() || (db_file.empty() && txt_file.empty() && h26x_file.empty() && aac_file.empty()))
 		goto help;
 
 	if (!FilePathIsExist(flv_file, false))
@@ -122,5 +143,5 @@ help:
 void print_help()
 {
 	printf("SimpleFlvParser usage: \n");
-	printf("\tSimpleFlvParser -i <input flv file> [-db <output db file>] [-txt <output text file>]\n");
+	printf("\tSimpleFlvParser -i <input flv file> [-db <output db file>] [-txt <output text file>] [-vcopy <output h264/h265 file>] [-acopy <output aac file>]\n");
 }
