@@ -518,6 +518,8 @@ std::string GetAudioTagTypeString(AudioTagType type)
 	}
 }
 
+std::shared_ptr<AudioSpecificConfig> AudioTagBody::CurrentAudioConfig = NULL;
+
 std::shared_ptr<AudioTagBody> AudioTagBody::Create(ByteReader& data, AudioFormat audio_format, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	switch (audio_format)
@@ -723,12 +725,11 @@ std::string AudioSpecificConfig::Serialize()
 
 AudioTagBodyAACConfig::AudioTagBodyAACConfig(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
-	if (demux_output)
-		demux_output->OnAudioAACData(data.CurrentPos(), 2);
-
 	aac_config_ = std::make_shared<AudioSpecificConfig>(data);
 	if (!aac_config_ || !aac_config_->is_good_)
 		return;
+
+	CurrentAudioConfig = aac_config_;
 
 	audio_tag_type_ = AudioTagTypeAACConfig;
 	is_good_ = true;
@@ -741,10 +742,69 @@ std::string AudioTagBodyAACConfig::GetExtraInfo()
 	return "";
 }
 
+static int GetADTSHeader(uint8_t* buffer, uint16_t aac_size, const std::shared_ptr<AudioSpecificConfig>& audio_config)
+{
+	/*
+	http://wiki.multimedia.cx/index.php?title=ADTS
+	ADTS
+	Audio Data Transport Stream (ADTS) is a format, used by MPEG TS or Shoutcast to stream audio, usually AAC.
+
+	Structure
+	AAAAAAAA AAAABCCD EEFFFFGH HHIJKLMM MMMMMMMM MMMOOOOO OOOOOOPP (QQQQQQQQ QQQQQQQQ)
+
+	Header consists of 7 or 9 bytes (without or with CRC).
+
+	Letter	Length (bits)	Description
+	A	12	syncword 0xFFF, all bits must be 1
+	B	1	MPEG Version: 0 for MPEG-4, 1 for MPEG-2
+	C	2	Layer: always 0
+	D	1	protection absent, Warning, set to 1 if there is no CRC and 0 if there is CRC
+	E	2	profile, the MPEG-4 Audio Object Type minus 1
+	F	4	MPEG-4 Sampling Frequency Index (15 is forbidden)
+	G	1	private bit, guaranteed never to be used by MPEG, set to 0 when encoding, ignore when decoding
+	H	3	MPEG-4 Channel Configuration (in the case of 0, the channel configuration is sent via an inband PCE)
+	I	1	originality, set to 0 when encoding, ignore when decoding
+	J	1	home, set to 0 when encoding, ignore when decoding
+	K	1	copyrighted id bit, the next bit of a centrally registered copyright identifier, set to 0 when encoding, ignore when decoding
+	L	1	copyright id start, signals that this frame's copyright id bit is the first bit of the copyright id, set to 0 when encoding, ignore when decoding
+	M	13	frame length, this value must include 7 or 9 bytes of header length: FrameLength = (ProtectionAbsent == 1 ? 7 : 9) + size(AACFrame)
+	O	11	Buffer fullness
+	P	2	Number of AAC frames (RDBs) in ADTS frame minus 1, for maximum compatibility always use 1 AAC frame per ADTS frame
+	Q	16	CRC if protection absent is 0
+
+	Usage in MPEG-TS
+	ADTS packet must be a content of PES packet. Pack AAC data inside ADTS frame, than pack inside PES packet, then mux by TS packetizer.
+
+	Usage in Shoutcast
+	ADTS frames goes one by one in TCP stream. Look for syncword, parse header and look for next syncword after.
+	*/
+
+	uint8_t profile = audio_config->audioObjectType - 1;
+	uint8_t sample_freq_index = audio_config->samplingFrequencyIndex;
+	uint8_t channel_cfg = audio_config->channelConfiguration;
+	uint16_t adts_frame_len = 7 + aac_size;
+
+	uint8_t pos = 0;
+	buffer[pos++] = 0xff; //syncword(high 8 bits, 1111 1111)
+	buffer[pos++] = 0xf1; //syncword(low 4 bits, 1111); ID(1 bit, 0); Layer(2 bit, 00); protection absent(1 bit, 0)
+	buffer[pos++] = ((profile & 0x03) << 6) | ((sample_freq_index & 0x0F) << 2) | ((channel_cfg & 0x07) >> 2); //profile, Sampling Frequency Index, first bit of channel configuration
+	buffer[pos++] = ((channel_cfg & 0x03) << 6) | ((adts_frame_len & 0x1FFF) >> 11); //last 2 bits of channel configuration, first 2 bits of frame length
+	buffer[pos++] = (adts_frame_len & 0x07FF) >> 3; //middle 8 bits of frame length
+	buffer[pos++] = ((adts_frame_len & 0x0007) << 5) | 0x1F; //last 3 bits of frame length, first 5 bits of buffer fullness
+	buffer[pos++] = 0x3F << 2; //last 6 bits of buffer fullness
+	
+	return pos;
+}
+
 AudioTagBodyAACData::AudioTagBodyAACData(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (demux_output)
+	{
+		uint8_t adts_header[20] = {0};
+		int adts_header_len = GetADTSHeader(adts_header, data.RemainingSize(), CurrentAudioConfig);
+		demux_output->OnAudioAACData(adts_header, adts_header_len);
 		demux_output->OnAudioAACData(data.CurrentPos(), data.RemainingSize());
+	}
 
 	audio_tag_type_ = AudioTagTypeAACData;
 	is_good_ = true;

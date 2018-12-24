@@ -198,6 +198,8 @@ struct AudioTagHeader
 	AudioTagHeader(ByteReader& data);
 };
 
+struct AudioSpecificConfig;
+
 class AudioTagBody
 {
 public:
@@ -213,6 +215,7 @@ protected:
 protected:
 	bool is_good_ = false;
 	AudioTagType audio_tag_type_;
+	static std::shared_ptr<AudioSpecificConfig> CurrentAudioConfig;
 };
 
 enum MPEG4AudioObjectType 
@@ -620,16 +623,16 @@ private:
 enum HevcNaluType
 {
 	HevcNaluTypeUnknown = -1,
-	HevcNaluTypeCodedSliceTrailN = 0, // 0
-	HevcNaluTypeCodedSliceTrailR,	  // 1
-	HevcNaluTypeCodedSliceTSAN,		  // 2
-	HevcNaluTypeCodedSliceTLA,		  // 3   // Current name in the spec: TSA_R
-	HevcNaluTypeCodedSliceSTSAN,	  // 4
-	HevcNaluTypeCodedSliceSTSAR,	  // 5
-	HevcNaluTypeCodedSliceRADLN,	  // 6
-	HevcNaluTypeCodedSliceDLP,		  // 7 // Current name in the spec: RADL_R
-	HevcNaluTypeCodedSliceRASLN,	  // 8
-	HevcNaluTypeCodedSliceTFD,		  // 9 // Current name in the spec: RASL_R
+	HevcNaluTypeCodedSliceTrailN = 0,	// 0
+	HevcNaluTypeCodedSliceTrailR, 		// 1
+	HevcNaluTypeCodedSliceTSAN,			// 2
+	HevcNaluTypeCodedSliceTLA, 			// 3 // Current name in the spec: TSA_R
+	HevcNaluTypeCodedSliceSTSAN, 		// 4
+	HevcNaluTypeCodedSliceSTSAR, 		// 5
+	HevcNaluTypeCodedSliceRADLN, 		// 6
+	HevcNaluTypeCodedSliceDLP, 			// 7 // Current name in the spec: RADL_R
+	HevcNaluTypeCodedSliceRASLN, 		// 8
+	HevcNaluTypeCodedSliceTFD,			// 9 // Current name in the spec: RASL_R
 
 	HevcNaluTypeReserved10,
 	HevcNaluTypeReserved11,
@@ -638,12 +641,12 @@ enum HevcNaluType
 	HevcNaluTypeReserved14,
 	HevcNaluTypeReserved15,
 
-	HevcNaluTypeCodedSliceBLA,	   // 16   // Current name in the spec: BLA_W_LP
-	HevcNaluTypeCodedSliceBLANT,	   // 17   // Current name in the spec: BLA_W_DLP
-	HevcNaluTypeCodedSliceBLANLP, // 18
-	HevcNaluTypeCodedSliceIDR,	   // 19  // Current name in the spec: IDR_W_DLP
-	HevcNaluTypeCodedSliceIDRNLP, // 20
-	HevcNaluTypeCodedSliceCRA,	   // 21
+	HevcNaluTypeCodedSliceBLA, 			// 16 // Current name in the spec: BLA_W_LP
+	HevcNaluTypeCodedSliceBLANT, 		// 17 // Current name in the spec: BLA_W_DLP
+	HevcNaluTypeCodedSliceBLANLP,  		// 18
+	HevcNaluTypeCodedSliceIDR,	  		// 19 // Current name in the spec: IDR_W_DLP
+	HevcNaluTypeCodedSliceIDRNLP, 		// 20
+	HevcNaluTypeCodedSliceCRA, 			// 21
 
 	HevcNaluTypeReserved22,
 	HevcNaluTypeReserved23,
@@ -659,12 +662,12 @@ enum HevcNaluType
 	HevcNaluTypeVPS,					// 32
 	HevcNaluTypeSPS,					// 33
 	HevcNaluTypePPS,					// 34
-	HevcNaluTypeAccessUnitDelimiter, // 35
+	HevcNaluTypeAccessUnitDelimiter, 	// 35
 	HevcNaluTypeEOS,					// 36
 	HevcNaluTypeEOB,					// 37
-	HevcNaluTypeFillerData,			// 38
+	HevcNaluTypeFillerData,			    // 38
 	HevcNaluTypeSEI,					// 39 Prefix SEI
-	HevcNaluTypeSEISuffix,			// 40 Suffix SEI
+	HevcNaluTypeSEISuffix,			    // 40 Suffix SEI
 	HevcNaluTypeReserved41,
 	HevcNaluTypeReserved42,
 	HevcNaluTypeReserved43,
