@@ -1,4 +1,4 @@
-// SimpleFlvParser.cpp : 定义控制台应用程序的入口点。
+// SimpleFlvParser.cpp
 //
 
 #include "simple_flv_parser.h"

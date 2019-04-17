@@ -1225,6 +1225,13 @@ void read_sei_payload(sei_t* s, BitReader& b, int payloadType, int payloadSize)
 			s->payload[i] = b.ReadU(8);
 		s->payloadSize = payloadSize - 16;
 	}
+	else if (payloadType == 100)
+	{
+		s->payload = (uint8_t*)malloc(payloadSize);
+		for (int i = 0; i < payloadSize; i++)
+			s->payload[i] = b.ReadU(8);
+		s->payloadSize = payloadSize;
+	}
 	else
 		b.SkipBytes(payloadSize);
 	read_sei_end_bits(b);
@@ -1283,7 +1290,7 @@ Json::Value seis_to_json(sei_t** seis, uint32_t num_seis)
 			continue;
 
 		json_sei["payloadType"] = sei->payloadType;
-		if (sei->payloadType == 5 && sei->payload && sei->payloadSize)
+		if ((sei->payloadType == 5 || sei->payloadType == 100) && sei->payload && sei->payloadSize)
 		{
 			std::string sei_content = std::string((char *)sei->payload, sei->payloadSize);
 			json_sei["payload"] = sei_content;
