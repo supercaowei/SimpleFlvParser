@@ -7,6 +7,7 @@
 #include "amf.h"
 #include "utils.h"
 #include "h264_syntax.h"
+#include "hevc_syntax.h"
 #include "json/value.h"
 #include <memory>
 #include <list>
@@ -408,26 +409,6 @@ protected:
 	VideoTagType video_tag_type_;
 };
 
-enum NaluType
-{
-	NaluTypeUnknown    = -1,
-	NaluTypeUnused     = 0,
-	NaluTypeNonIDR     = 1,
-	NaluTypeSliceDPA   = 2,
-	NaluTypeSliceDPB   = 3,
-	NaluTypeSliceDPC   = 4,
-	NaluTypeIDR        = 5,
-	NaluTypeSEI        = 6,
-	NaluTypeSPS        = 7,
-	NaluTypePPS        = 8,
-	NaluTypeAUD        = 9,
-	NaluTypeSeqEnd     = 10,
-	NaluTypeStreamEnd  = 11,
-	NaluTypeFillerData = 12,
-	NaluTypeSPSExt     = 13,
-	NaluTypeSliceAux   = 19,
-};
-
 std::string GetNaluTypeString(NaluType type);
 
 struct NaluHeader
@@ -620,80 +601,6 @@ private:
 //////////////////////////////////////////////////////////////////////////
 //HEVC
 
-enum HevcNaluType
-{
-	HevcNaluTypeUnknown = -1,
-	HevcNaluTypeCodedSliceTrailN = 0,	// 0
-	HevcNaluTypeCodedSliceTrailR, 		// 1
-	HevcNaluTypeCodedSliceTSAN,			// 2
-	HevcNaluTypeCodedSliceTLA, 			// 3 // Current name in the spec: TSA_R
-	HevcNaluTypeCodedSliceSTSAN, 		// 4
-	HevcNaluTypeCodedSliceSTSAR, 		// 5
-	HevcNaluTypeCodedSliceRADLN, 		// 6
-	HevcNaluTypeCodedSliceDLP, 			// 7 // Current name in the spec: RADL_R
-	HevcNaluTypeCodedSliceRASLN, 		// 8
-	HevcNaluTypeCodedSliceTFD,			// 9 // Current name in the spec: RASL_R
-
-	HevcNaluTypeReserved10,
-	HevcNaluTypeReserved11,
-	HevcNaluTypeReserved12,
-	HevcNaluTypeReserved13,
-	HevcNaluTypeReserved14,
-	HevcNaluTypeReserved15,
-
-	HevcNaluTypeCodedSliceBLA, 			// 16 // Current name in the spec: BLA_W_LP
-	HevcNaluTypeCodedSliceBLANT, 		// 17 // Current name in the spec: BLA_W_DLP
-	HevcNaluTypeCodedSliceBLANLP,  		// 18
-	HevcNaluTypeCodedSliceIDR,	  		// 19 // Current name in the spec: IDR_W_DLP
-	HevcNaluTypeCodedSliceIDRNLP, 		// 20
-	HevcNaluTypeCodedSliceCRA, 			// 21
-
-	HevcNaluTypeReserved22,
-	HevcNaluTypeReserved23,
-	HevcNaluTypeReserved24,
-	HevcNaluTypeReserved25,
-	HevcNaluTypeReserved26,
-	HevcNaluTypeReserved27,
-	HevcNaluTypeReserved28,
-	HevcNaluTypeReserved29,
-	HevcNaluTypeReserved30,
-	HevcNaluTypeReserved31,
-
-	HevcNaluTypeVPS,					// 32
-	HevcNaluTypeSPS,					// 33
-	HevcNaluTypePPS,					// 34
-	HevcNaluTypeAccessUnitDelimiter, 	// 35
-	HevcNaluTypeEOS,					// 36
-	HevcNaluTypeEOB,					// 37
-	HevcNaluTypeFillerData,			    // 38
-	HevcNaluTypeSEI,					// 39 Prefix SEI
-	HevcNaluTypeSEISuffix,			    // 40 Suffix SEI
-	HevcNaluTypeReserved41,
-	HevcNaluTypeReserved42,
-	HevcNaluTypeReserved43,
-	HevcNaluTypeReserved44,
-	HevcNaluTypeReserved45,
-	HevcNaluTypeReserved46,
-	HevcNaluTypeReserved47,
-	HevcNaluTypeUnspecified48,
-	HevcNaluTypeUnspecified49,
-	HevcNaluTypeUnspecified50,
-	HevcNaluTypeUnspecified51,
-	HevcNaluTypeUnspecified52,
-	HevcNaluTypeUnspecified53,
-	HevcNaluTypeUnspecified54,
-	HevcNaluTypeUnspecified55,
-	HevcNaluTypeUnspecified56,
-	HevcNaluTypeUnspecified57,
-	HevcNaluTypeUnspecified58,
-	HevcNaluTypeUnspecified59,
-	HevcNaluTypeUnspecified60,
-	HevcNaluTypeUnspecified61,
-	HevcNaluTypeUnspecified62,
-	HevcNaluTypeUnspecified63,
-	HevcNaluTypeInvalid,
-};
-
 std::string GetHevcNaluTypeString(HevcNaluType type);
 
 struct HevcNaluHeader
@@ -705,9 +612,11 @@ struct HevcNaluHeader
 class HevcNaluBase : public NaluInterface
 {
 public:
+	static std::shared_ptr<HevcNaluBase> Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~HevcNaluBase() {}
 	bool IsGood() { return is_good_; }
+	void ReleaseRbsp();
 	void SetTagSerialBelong(int tag_serial_belong) { tag_serial_belong_ = tag_serial_belong; }
 	const std::shared_ptr<HevcNaluHeader>& GetHevcNaluHeader() { return nalu_header_; }
 	virtual std::string CompleteInfo();
@@ -725,11 +634,31 @@ public:
 	virtual int SliceQpDelta() override;
 	virtual std::string ExtraInfo() override;
 
+private:
+	//don't change ByteReader position, get the nalu type
+	static HevcNaluType GetHevcNaluType(const ByteReader& data, uint8_t nalu_len_size);
+
 protected:
 	int tag_serial_belong_ = -1;
 	uint32_t nalu_size_ = 0;
 	std::shared_ptr<HevcNaluHeader> nalu_header_;
 	bool is_good_ = false;
+	uint8_t *rbsp_ = NULL;
+	uint32_t rbsp_size_ = 0;
+};
+
+class HevcNaluSEI : public HevcNaluBase
+{
+public:
+	HevcNaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	~HevcNaluSEI();
+
+	virtual std::string CompleteInfo() override;
+	virtual std::string ExtraInfo() override;
+
+private:
+	hevc_sei_t**  seis_ = NULL;
+	uint32_t sei_num_ = 0;
 };
 
 class VideoTagBodyHEVCNalu : public VideoTagBody

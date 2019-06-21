@@ -18,6 +18,26 @@
 #define SLICE_TYPE_SP_ONLY   8        // SP (SP slice)
 #define SLICE_TYPE_SI_ONLY   9        // SI (SI slice)
 
+enum NaluType
+{
+	NaluTypeUnknown    = -1,
+	NaluTypeUnused     = 0,
+	NaluTypeNonIDR     = 1,
+	NaluTypeSliceDPA   = 2,
+	NaluTypeSliceDPB   = 3,
+	NaluTypeSliceDPC   = 4,
+	NaluTypeIDR        = 5,
+	NaluTypeSEI        = 6,
+	NaluTypeSPS        = 7,
+	NaluTypePPS        = 8,
+	NaluTypeAUD        = 9,
+	NaluTypeSeqEnd     = 10,
+	NaluTypeStreamEnd  = 11,
+	NaluTypeFillerData = 12,
+	NaluTypeSPSExt     = 13,
+	NaluTypeSliceAux   = 19,
+};
+
 /**
 Sequence Parameter Set
 @see 7.3.2.1 Sequence parameter set RBSP syntax
@@ -252,6 +272,12 @@ typedef struct
 
 class BitReader;
 
+void read_rbsp_trailing_bits(BitReader& b);
+
+int _read_ff_coded_number(BitReader& b);
+
+int more_rbsp_data(BitReader& b);
+
 int  nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, int* rbsp_size);
 
 void read_seq_parameter_set_rbsp(sps_t* sps, BitReader& b);
@@ -267,6 +293,8 @@ void read_slice_header_rbsp(slice_header_t* sh, BitReader& b, uint8_t nal_unit_t
 Json::Value slice_header_to_json(slice_header_t* sh, uint8_t nal_unit_type, uint8_t nal_ref_idc);
 
 sei_t** read_sei_rbsp(uint32_t *num_seis, BitReader& b);
+
+void read_sei_end_bits(BitReader& b);
 
 void release_seis(sei_t** seis, uint32_t num_seis);
 

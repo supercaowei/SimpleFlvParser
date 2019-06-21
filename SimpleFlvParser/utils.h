@@ -37,14 +37,16 @@ private:
 class BitReader
 {
 public:
-	BitReader(uint8_t* byte_start, uint32_t byte_len);
-	BitReader(uint8_t* byte_start, uint8_t* byte_end);
+	BitReader(uint8_t* byte_start, uint32_t byte_len, uint8_t bits_left = 8); //bits left in the starting byte, 1 <= bits_left <= 8
 
 	bool IsByteAligned() { return bits_left_ == 8; }
 	bool Eof() { return p_ >= end_; }
 	bool Overrun() { return p_ > end_; }
-	uint32_t Pos() { return ((p_ > end_) ? (end_ - start_) : (p_ - start_)); }
-	uint32_t BytesLeft() { return ((p_ >= end_) ? 0 : (end_ - p_)); }
+	uint8_t* ByteStart() { return start_; }
+	uint8_t* ByteEnd() { return end_; }
+	uint8_t* BytePos() { return p_; }
+	uint32_t BytesLeft() { return Eof() ? 0 : (end_ - p_); }
+	uint8_t  BitsLeft() { return bits_left_; } //bits left in the byte pointed by p_, 1 << bits_left_ << 8
 
 	uint32_t ReadU1();
 	void SkipU1();
@@ -63,7 +65,7 @@ private:
 	uint8_t* start_ = NULL;
 	uint8_t* p_ = NULL;
 	uint8_t* end_ = NULL;
-	int bits_left_ = 0; //how many bits left in the byte pointed by p_
+	uint8_t bits_left_ = 0; //how many bits left in the byte pointed by p_
 };
 
 #endif

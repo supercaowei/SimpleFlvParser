@@ -215,28 +215,25 @@ uint32_t ByteReader::RemainingSize() const
 //////////////////////////////////////////////////////////////////////////
 // BitReader
 
-BitReader::BitReader(uint8_t* byte_start, uint32_t byte_len)
+BitReader::BitReader(uint8_t* byte_start, uint32_t byte_len, uint8_t bits_left)
 {
+	if (!byte_start || !byte_len || bits_left < 1 || bits_left > 8)
+	    return;
+		
 	start_ = byte_start;
 	p_ = byte_start;
 	end_ = byte_start + byte_len;
-	bits_left_ = 8;
-}
-
-BitReader::BitReader(uint8_t* byte_start, uint8_t* byte_end)
-{
-	start_ = byte_start;
-	p_ = byte_start;
-	end_ = byte_end;
-	bits_left_ = 8;
+	bits_left_ = bits_left;
 }
 
 uint32_t BitReader::ReadU1()
 {
 	uint32_t r = 0;
+	if (Eof())
+		return r;
+
 	bits_left_--;
-	if (!Eof())
-		r = (*p_ >> bits_left_) & 0x01;
+	r = (*p_ >> bits_left_) & 0x01;
 
 	if (bits_left_ == 0)
 	{
@@ -249,6 +246,9 @@ uint32_t BitReader::ReadU1()
 
 void BitReader::SkipU1()
 {
+	if (Eof())
+		return;
+
 	bits_left_--;
 	if (bits_left_ == 0)
 	{
@@ -267,24 +267,32 @@ uint32_t BitReader::PeekU1()
 	return r;
 }
 
-uint32_t pr[100] = { 0 };
-
 uint32_t BitReader::ReadU(int nbits)
 {
 	uint32_t r = 0;
+
 	for (int i = 0; i < nbits; i++)
-	{
 		r |= (ReadU1() << (nbits - i - 1));
-		if (nbits == 32)
-			pr[i] = r;
-	}
+
 	return r;
 }
 
 void BitReader::SkipU(int nbis)
 {
-	for (int i = 0; i < nbis; i++)
-		SkipU1();
+	if (nbis < bits_left_)
+	{
+		bits_left_ -= nbis;
+		return;
+	}
+
+	p_ -= 1 + (nbis - bits_left_) / 8;
+	bits_left_ = 8 - ((nbis - bits_left_) % 8);
+
+	if (Eof())
+	{
+		p_ = end_;
+		bits_left_ = 8;
+	}
 }
 
 uint32_t BitReader::ReadF(int nbits) 
@@ -309,7 +317,7 @@ uint32_t BitReader::ReadUE()
 	int32_t r = 0;
 	int i = 0;
 
-	while ((ReadU1() == 0) && (i < 32) && (!Eof()))
+	while (ReadU1() == 0 && i < 32 && !Eof())
 		i++;
 
 	r = ReadU(i);
@@ -320,26 +328,34 @@ uint32_t BitReader::ReadUE()
 int32_t BitReader::ReadSE()
 {
 	int32_t r = ReadUE();
+
 	if (r & 0x01)
 		r = (r + 1) / 2;
 	else
-	{
 		r = -(r / 2);
-	}
+
 	return r;
 }
 
 int BitReader::ReadBytes(uint8_t* buf, int len)
 {
 	int actual_len = len;
-	if (end_ - p_ < actual_len)
+	if (actual_len > 0 && end_ - p_ < actual_len)
 		actual_len = end_ - p_;
-	if (actual_len < 0)
-		actual_len = 0;
-	memcpy(buf, p_, actual_len);
-	if (len < 0)
-		len = 0;
-	p_ += len;
+	if (actual_len <= 0)
+		return 0;
+
+	if (IsByteAligned()) 
+	{
+		memcpy(buf, p_, actual_len);
+		p_ += actual_len;
+	}
+	else
+	{
+		for (int i = 0; i < actual_len; i++)
+			buf[i] = (uint8_t)ReadU(8);
+	}
+	
 	return actual_len;
 }
 
@@ -347,13 +363,11 @@ int BitReader::ReadBytes(uint8_t* buf, int len)
 int BitReader::SkipBytes(int len)
 {
 	int actual_len = len;
-	if (end_ - p_ < actual_len)
+	if (actual_len > 0 && end_ - p_ < actual_len)
 		actual_len = end_ - p_;
-	if (actual_len < 0)
+	if (actual_len <= 0)
 		actual_len = 0;
-	if (len < 0)
-		len = 0;
-	p_ += len;
+	p_ += actual_len;
 	return actual_len;
 }
 

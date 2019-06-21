@@ -1663,7 +1663,7 @@ std::string GetHevcNaluTypeString(HevcNaluType type)
 	case HevcNaluTypeFillerData:
 		return "FillerData";
 	case HevcNaluTypeSEI:
-		return "SEI";
+		return "SEIPrefix";
 	case HevcNaluTypeSEISuffix:
 		return "SEISuffix";
 	case HevcNaluTypeReserved41:
@@ -1724,6 +1724,19 @@ HevcNaluHeader::HevcNaluHeader(uint16_t b)
 	nal_unit_type_ = (HevcNaluType)((b >> 9) & 0x3F);
 }
 
+std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+{
+	HevcNaluType nalu_type = GetHevcNaluType(data, nalu_len_size);
+	switch (nalu_type)
+	{
+	case HevcNaluTypeSEI:
+	case HevcNaluTypeSEISuffix:
+		return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
+	default:
+		return std::make_shared<HevcNaluBase>(data, nalu_len_size, demux_output);
+	}
+}
+
 HevcNaluBase::HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
@@ -1748,9 +1761,38 @@ HevcNaluBase::HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::s
 
 	//parse nalu header
 	nalu_header_ = std::make_shared<HevcNaluHeader>((uint16_t)BytesToInt(data.CurrentPos(), 2));
-	data.ReadBytes(nalu_size_);
+
+	//allocate memory and transfer nal to rbsp
+	rbsp_size_ = nalu_size_;
+	rbsp_ = (uint8_t *)malloc(rbsp_size_);
+	int nalu_size_tmp = (int)nalu_size_;
+	uint8_t * nalu_buffer = data.ReadBytes(nalu_size_);
+	int ret = hevc_nal_to_rbsp(nalu_buffer, &nalu_size_tmp, rbsp_, (int *)&rbsp_size_);
+	if (ret < 0 || !rbsp_ || !rbsp_size_)
+	{
+		ReleaseRbsp();
+		return;
+	}
 
 	is_good_ = true;
+}
+
+HevcNaluType HevcNaluBase::GetHevcNaluType(const ByteReader& data, uint8_t nalu_len_size)
+{
+	if (data.RemainingSize() < (uint32_t)(nalu_len_size + 2))
+		return HevcNaluTypeUnknown;
+	HevcNaluHeader nalu_header((uint16_t)BytesToInt(data.CurrentPos() + nalu_len_size, 2));
+	return nalu_header.nal_unit_type_;
+}
+
+void HevcNaluBase::ReleaseRbsp()
+{
+	if (rbsp_)
+	{
+		free(rbsp_);
+		rbsp_ = NULL;
+		rbsp_size_ = 0;
+	}
 }
 
 std::string HevcNaluBase::CompleteInfo()
@@ -1820,6 +1862,45 @@ std::string HevcNaluBase::ExtraInfo()
 	return "";
 }
 
+HevcNaluSEI::HevcNaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_len_size, demux_output)
+{
+	if (!is_good_) //NaluBase parse error
+		return;
+	is_good_ = false;
+	if (nalu_header_->nal_unit_type_ != HevcNaluTypeSEI && nalu_header_->nal_unit_type_ != HevcNaluTypeSEISuffix)
+		return;
+
+	BitReader rbsp_data(rbsp_, rbsp_size_);
+	seis_ = read_hevc_sei_rbsp(&sei_num_, rbsp_data, (int)nalu_header_->nal_unit_type_);
+	ReleaseRbsp();
+	if (!seis_ || !sei_num_)
+		return;
+	is_good_ = true;
+}
+
+HevcNaluSEI::~HevcNaluSEI()
+{
+	if (seis_ || sei_num_)
+	{
+		release_hevc_seis(seis_, sei_num_);
+		seis_ = NULL;
+		sei_num_ = 0;
+	}
+}
+
+std::string HevcNaluSEI::CompleteInfo()
+{
+	return ExtraInfo();
+}
+
+std::string HevcNaluSEI::ExtraInfo()
+{
+	Json::Value extra_info;
+	extra_info["seis"] = hevc_seis_to_json(seis_, sei_num_);
+	return extra_info.toStyledString();
+}
+
 VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < 3)
@@ -1828,7 +1909,7 @@ VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_p
 
 	while (data.RemainingSize())
 	{
-		std::shared_ptr<HevcNaluBase> nalu = std::make_shared<HevcNaluBase>(data, 4, demux_output);
+		std::shared_ptr<HevcNaluBase> nalu = HevcNaluBase::Create(data, 4, demux_output);
 		if (!nalu)
 			break;
 		else if (!nalu->IsGood())

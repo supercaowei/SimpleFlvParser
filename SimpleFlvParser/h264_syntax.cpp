@@ -21,6 +21,7 @@ int nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, int* r
 	int count = 0;
 	bool trailing_zero = false;
 
+	//i starts with 1, because the 1st byte is nalu header
 	for (i = 1; i < *nal_size; i++)
 	{
 		for (k = i; k < *nal_size; k++)
@@ -1088,9 +1089,10 @@ void read_slice_header_rbsp(slice_header_t* sh, BitReader& b, uint8_t nal_unit_t
 	if (pps->num_slice_groups_minus1 > 0 &&
 		pps->slice_group_map_type >= 3 && pps->slice_group_map_type <= 5)
 	{
-		sh->slice_group_change_cycle =
-			b.ReadU(intlog2(pps->pic_size_in_map_units_minus1 +
-			pps->slice_group_change_rate_minus1 + 1)); // was u(v) // FIXME add 2?
+		printf("caution: slice_group_change_cycle size may be error.\n");
+		//see slice_group_change_cycle in 7.4.3
+		sh->slice_group_change_cycle = b.ReadU(intlog2(
+			(pps->pic_size_in_map_units_minus1 + 1) / (pps->slice_group_change_rate_minus1 + 1) + 1)); // was u(v)
 	}
 }
 
@@ -1210,8 +1212,6 @@ void read_sei_end_bits(BitReader& b)
 				fprintf(stderr, "WARNING: bit_equal_to_zero is 1!!!!\n");
 		}
 	}
-
-	read_rbsp_trailing_bits(b);
 }
 
 // D.1 SEI payload syntax
