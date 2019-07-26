@@ -1729,9 +1729,9 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint8_t nal
 	HevcNaluType nalu_type = GetHevcNaluType(data, nalu_len_size);
 	switch (nalu_type)
 	{
-	case HevcNaluTypeSEI:
-	case HevcNaluTypeSEISuffix:
-		return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
+	// case HevcNaluTypeSEI:
+	// case HevcNaluTypeSEISuffix:
+	// 	return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
 	default:
 		return std::make_shared<HevcNaluBase>(data, nalu_len_size, demux_output);
 	}
