@@ -1417,7 +1417,10 @@ std::string NaluSEI::CompleteInfo()
 std::string NaluSEI::ExtraInfo()
 {
 	Json::Value extra_info;
-	extra_info["seis"] = seis_to_json(seis_, sei_num_);
+	Json::Value json_sei = seis_to_json(seis_, sei_num_);
+	std::string sei = json_sei.toStyledString();
+	printf("%s\n", sei.c_str());
+	extra_info["seis"] = json_sei;
 	return extra_info.toStyledString();
 }
 
@@ -1729,9 +1732,9 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint8_t nal
 	HevcNaluType nalu_type = GetHevcNaluType(data, nalu_len_size);
 	switch (nalu_type)
 	{
-	// case HevcNaluTypeSEI:
-	// case HevcNaluTypeSEISuffix:
-	// 	return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
+	case HevcNaluTypeSEI:
+	case HevcNaluTypeSEISuffix:
+		return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
 	default:
 		return std::make_shared<HevcNaluBase>(data, nalu_len_size, demux_output);
 	}
@@ -1944,13 +1947,13 @@ HEVCDecoderConfigurationRecord::HEVCDecoderConfigurationRecord(ByteReader& data,
 {
 	if (data.RemainingSize() < 23)
 		return;
-	data.ReadBytes(22);
+	data.ReadBytes(22); //The first 22 bytes of HEVCDecoderConfigurationRecord are various flags and info
 
-	int array_count = *data.ReadBytes(1);
+	int array_count = *data.ReadBytes(1); //The 23rd byte (index 22) is the number of nalu arrays
 	for (int i = 0; i < array_count; i++)
 	{
 		data.ReadBytes(1);
-		int nalu_count = (int)BytesToInt(data.ReadBytes(2), 2);
+		int nalu_count = (int)BytesToInt(data.ReadBytes(2), 2); //The number of nalus in single array
 		for (int j = 0; j < nalu_count; j++)
 		{
 			std::shared_ptr<HevcNaluBase> nalu = std::make_shared<HevcNaluBase>(data, 2, demux_output);
