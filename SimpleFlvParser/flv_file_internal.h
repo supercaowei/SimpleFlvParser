@@ -422,8 +422,8 @@ struct NaluHeader
 class NaluBase : public NaluInterface
 {
 public:
-	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
-	NaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	static std::shared_ptr<NaluBase> Create(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluBase(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~NaluBase();
 	bool IsGood() { return is_good_; }
 	bool IsNoBother() { return no_bother; }
@@ -445,10 +445,6 @@ public:
 	virtual int SliceQpDelta() override;
 	virtual std::string ExtraInfo() override;
 
-private:
-	//don't change ByteReader position, get the nalu type
-	static NaluType GetNaluType(const ByteReader& data, uint8_t nalu_len_size);
-
 public:
 	static std::shared_ptr<NaluBase> CurrentSps;
 	static std::shared_ptr<NaluBase> CurrentPps;
@@ -466,7 +462,7 @@ protected:
 class NaluSps : public NaluBase
 {
 public:
-	NaluSps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluSps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	std::shared_ptr<sps_t> sps_;
 
 	virtual std::string CompleteInfo() override;
@@ -476,7 +472,7 @@ public:
 class NaluPps : public NaluBase
 {
 public:
-	NaluPps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluPps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	std::shared_ptr<pps_t> pps_;
 
 	virtual std::string CompleteInfo() override;
@@ -486,7 +482,7 @@ public:
 class NaluSlice : public NaluBase
 {
 public:
-	NaluSlice(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluSlice(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 
 	virtual std::string CompleteInfo() override;
 	virtual int8_t FirstMbInSlice() override;
@@ -505,7 +501,7 @@ private:
 class NaluSEI : public NaluBase
 {
 public:
-	NaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	NaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~NaluSEI();
 
 	virtual std::string CompleteInfo() override;
@@ -612,8 +608,8 @@ struct HevcNaluHeader
 class HevcNaluBase : public NaluInterface
 {
 public:
-	static std::shared_ptr<HevcNaluBase> Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
-	HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	static std::shared_ptr<HevcNaluBase> Create(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	HevcNaluBase(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	virtual ~HevcNaluBase() {}
 	bool IsGood() { return is_good_; }
 	void ReleaseRbsp();
@@ -650,14 +646,14 @@ protected:
 class HevcNaluSEI : public HevcNaluBase
 {
 public:
-	HevcNaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	HevcNaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
 	~HevcNaluSEI();
 
 	virtual std::string CompleteInfo() override;
 	virtual std::string ExtraInfo() override;
 
 private:
-	hevc_sei_t**  seis_ = NULL;
+	hevc_sei_t** seis_ = NULL;
 	uint32_t sei_num_ = 0;
 };
 

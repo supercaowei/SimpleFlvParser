@@ -163,9 +163,12 @@ std::string FileNameFromFilePath(const std::string& path)
 int BytesToInt(uint8_t * pData, int iCount)
 {
 	int iResult = 0;
-	for (int i = 0; i < iCount; i++)
+	if (pData) 
 	{
-		iResult += pData[i] << ((iCount - 1 - i) * 8);
+		for (int i = 0; i < iCount; i++)
+		{
+			iResult += pData[i] << ((iCount - 1 - i) * 8);
+		}
 	}
 	return iResult;
 }

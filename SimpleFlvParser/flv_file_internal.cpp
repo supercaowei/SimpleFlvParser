@@ -9,6 +9,8 @@
 #define FLV_AUDIO_TAG_HEADER_SIZE 1
 #define STRING_UNKNOWN "Unknown"
 
+extern bool print_sei;
+
 FlvHeader::FlvHeader(ByteReader& data)
 {
 	if (data.RemainingSize() < FLV_HEADER_SIZE)
@@ -1057,38 +1059,51 @@ NaluHeader::NaluHeader(uint8_t b)
 
 std::shared_ptr<NaluBase> NaluBase::CurrentSps = std::shared_ptr<NaluBase>(nullptr);
 std::shared_ptr<NaluBase> NaluBase::CurrentPps = std::shared_ptr<NaluBase>(nullptr);
-std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
-	NaluType nalu_type = GetNaluType(data, nalu_len_size);
+	if (data.RemainingSize() < nalu_size || nalu_size <= 1) {
+		printf("data remaining size %d, nalu size %d\n", data.RemainingSize(), nalu_size);
+		return NULL;
+	}
 
+	std::shared_ptr<NaluBase> nalu;
+	uint8_t nalu_header = *data.ReadBytes(1, false); //just peek 1 byte
+	NaluType nalu_type = (NaluType)(nalu_header & 0x1f);
 	switch (nalu_type)
 	{
 	case NaluTypeNonIDR:
 	case NaluTypeIDR:
 	case NaluTypeSliceAux:
-		return std::make_shared<NaluSlice>(data, nalu_len_size, demux_output);
+		nalu = std::make_shared<NaluSlice>(data, nalu_size, demux_output);
+		break;
 	case NaluTypeSEI:
-		return std::make_shared<NaluSEI>(data, nalu_len_size, demux_output);
+		nalu = std::make_shared<NaluSEI>(data, nalu_size, demux_output);
+		break;
 	case NaluTypeSPS:
-		CurrentSps = std::make_shared<NaluSps>(data, nalu_len_size, demux_output);
-		return CurrentSps;
+		CurrentSps = std::make_shared<NaluSps>(data, nalu_size, demux_output);
+		nalu = CurrentSps;
+		break;
 	case NaluTypePPS:
-		CurrentPps = std::make_shared<NaluPps>(data, nalu_len_size, demux_output);
-		return CurrentPps;
+		CurrentPps = std::make_shared<NaluPps>(data, nalu_size, demux_output);
+		nalu = CurrentPps;
+		break;
 	default:
-		return std::make_shared<NaluBase>(data, nalu_len_size, demux_output);
+		nalu = std::make_shared<NaluBase>(data, nalu_size, demux_output);
+		break;
 	}
+
+	if (nalu && !nalu->IsGood()) {
+		std::string nalu_type_string = GetNaluTypeString(nalu->GetNaluHeader()->nal_unit_type_);
+		printf("nalu 0x%p (type: %s, size: %d) is not good\n", nalu.get(), nalu_type_string.c_str(), nalu->NaluSize());
+		nalu = NULL;
+	}
+
+	return nalu;
 }
 
-NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+NaluBase::NaluBase(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
-	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
-	// In AVCDecoderConfigurationRecord, it's 2. In AVC data, it's 4.
-	if (nalu_len_size > 4) 
-		return;
-	if (data.RemainingSize() < nalu_len_size)
-		return;
-	nalu_size_ = (uint32_t)BytesToInt(data.ReadBytes(nalu_len_size), nalu_len_size);
+	nalu_size_ = nalu_size;
 	if (data.RemainingSize() < nalu_size_)
 	{
 		data.ReadBytes(data.RemainingSize());
@@ -1124,18 +1139,6 @@ NaluBase::NaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_pt
 NaluBase::~NaluBase()
 {
 	ReleaseRbsp();
-}
-
-NaluType NaluBase::GetNaluType(const ByteReader& data, uint8_t nalu_len_size)
-{
-	if (nalu_len_size > 4)
-		return NaluTypeUnknown;
-	//The first nalu_len_size bytes of nalu_start are nalu length, The nalu header is after the nalu length
-	if (data.RemainingSize() < (uint32_t)(nalu_len_size + 1))
-		return NaluTypeUnknown;
-	
-	uint8_t nalu_header = *(data.CurrentPos() + nalu_len_size);
-	return (NaluType)(nalu_header & 0x1f);
 }
 
 void NaluBase::ReleaseRbsp()
@@ -1227,7 +1230,7 @@ std::string NaluBase::ExtraInfo()
 	return "";
 }
 
-NaluSps::NaluSps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+NaluSps::NaluSps(ByteReader& data, uint32_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
 	: NaluBase(data, nalu_len_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
@@ -1261,8 +1264,8 @@ std::string NaluSps::ExtraInfo()
 	return "";
 }
 
-NaluPps::NaluPps(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
-	: NaluBase(data, nalu_len_size, demux_output)
+NaluPps::NaluPps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1295,8 +1298,8 @@ std::string NaluPps::ExtraInfo()
 	return "";
 }
 
-NaluSlice::NaluSlice(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
-	: NaluBase(data, nalu_len_size, demux_output)
+NaluSlice::NaluSlice(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1382,8 +1385,8 @@ std::string NaluSlice::ExtraInfo()
 	return "";
 }
 
-NaluSEI::NaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
-	: NaluBase(data, nalu_len_size, demux_output)
+NaluSEI::NaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: NaluBase(data, nalu_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1418,8 +1421,11 @@ std::string NaluSEI::ExtraInfo()
 {
 	Json::Value extra_info;
 	Json::Value json_sei = seis_to_json(seis_, sei_num_);
-	std::string sei = json_sei.toStyledString();
-	printf("%s\n", sei.c_str());
+	if (print_sei) 
+	{
+		std::string sei = json_sei.toStyledString();
+		printf("%s\n", sei.c_str());
+	}
 	extra_info["seis"] = json_sei;
 	return extra_info.toStyledString();
 }
@@ -1430,9 +1436,10 @@ VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data, const std::shared_ptr
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 
-	while (data.RemainingSize())
+	while (data.RemainingSize() > 4)
 	{
-		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, 4, demux_output);
+		uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(4), 4);
+		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, nalu_size, demux_output);
 		if (!nalu || !nalu->IsNoBother())
 			break;
 		else if (!nalu->IsGood())
@@ -1490,7 +1497,8 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data, c
 	numOfSequenceParameterSets = *data.ReadBytes(1);
 	if ((numOfSequenceParameterSets & 0x1F) != 1) //Only 1 sps, says Adobe
 		return;
-	sps_nal_ = NaluBase::Create(data, 2, demux_output);
+	uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(2), 2);
+	sps_nal_ = NaluBase::Create(data, nalu_size, demux_output);
 	if (!sps_nal_ || !sps_nal_->IsGood())
 		return;
 
@@ -1500,7 +1508,8 @@ AVCDecoderConfigurationRecord::AVCDecoderConfigurationRecord(ByteReader& data, c
 	numOfPictureParameterSets = *data.ReadBytes(1);
 	if (numOfPictureParameterSets != 1) //Only 1 pps, says Adobe
 		return;
-	pps_nal_ = NaluBase::Create(data, 2, demux_output);
+	nalu_size = (uint32_t)BytesToInt(data.ReadBytes(2), 2);
+	pps_nal_ = NaluBase::Create(data, nalu_size, demux_output);
 	if (!pps_nal_ || !pps_nal_->IsGood())
 		return;
 
@@ -1727,28 +1736,38 @@ HevcNaluHeader::HevcNaluHeader(uint16_t b)
 	nal_unit_type_ = (HevcNaluType)((b >> 9) & 0x3F);
 }
 
-std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
-	HevcNaluType nalu_type = GetHevcNaluType(data, nalu_len_size);
-	switch (nalu_type)
+	if (data.RemainingSize() < nalu_size || nalu_size <= 2) {
+		printf("data remaining size %d, nalu size %d\n", data.RemainingSize(), nalu_size);
+		return NULL;
+	}
+
+	std::shared_ptr<HevcNaluBase> nalu;
+	HevcNaluHeader nalu_header((uint16_t)BytesToInt(data.CurrentPos(), 2)); //just peek 2 bytes
+	switch (nalu_header.nal_unit_type_)
 	{
 	case HevcNaluTypeSEI:
 	case HevcNaluTypeSEISuffix:
-		return std::make_shared<HevcNaluSEI>(data, nalu_len_size, demux_output);
+		// nalu = std::make_shared<HevcNaluSEI>(data, nalu_size, demux_output);
+		// break;
 	default:
-		return std::make_shared<HevcNaluBase>(data, nalu_len_size, demux_output);
+		nalu = std::make_shared<HevcNaluBase>(data, nalu_size, demux_output);
+		break;
 	}
+
+	if (nalu && !nalu->IsGood()) {
+		std::string nalu_type_string = GetHevcNaluTypeString(nalu_header.nal_unit_type_);
+		printf("nalu 0x%p (type: %s, size: %d) is not good\n", nalu.get(), nalu_type_string.c_str(), nalu->NaluSize());
+		nalu = NULL;
+	}
+
+	return nalu;
 }
 
-HevcNaluBase::HevcNaluBase(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+HevcNaluBase::HevcNaluBase(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
-	//nalu_len_size indicates how many bytes at the ByteReader's start is the nalu length
-	// In vps sps and pps, it's 2. In IDR, p, b frames and SEI nalu, it's 4.
-	if (nalu_len_size > 4)
-		return;
-	if (data.RemainingSize() < nalu_len_size)
-		return;
-	nalu_size_ = (uint32_t)BytesToInt(data.ReadBytes(nalu_len_size), nalu_len_size);
+	nalu_size_ = nalu_size;
 	if (data.RemainingSize() < nalu_size_)
 	{
 		data.ReadBytes(data.RemainingSize());
@@ -1865,8 +1884,8 @@ std::string HevcNaluBase::ExtraInfo()
 	return "";
 }
 
-HevcNaluSEI::HevcNaluSEI(ByteReader& data, uint8_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
-	: HevcNaluBase(data, nalu_len_size, demux_output)
+HevcNaluSEI::HevcNaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_size, demux_output)
 {
 	if (!is_good_) //NaluBase parse error
 		return;
@@ -1910,9 +1929,10 @@ VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_p
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 
-	while (data.RemainingSize())
+	while (data.RemainingSize() > 4)
 	{
-		std::shared_ptr<HevcNaluBase> nalu = HevcNaluBase::Create(data, 4, demux_output);
+		uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(4), 4);
+		std::shared_ptr<HevcNaluBase> nalu = HevcNaluBase::Create(data, nalu_size, demux_output);
 		if (!nalu)
 			break;
 		else if (!nalu->IsGood())
@@ -1956,8 +1976,10 @@ HEVCDecoderConfigurationRecord::HEVCDecoderConfigurationRecord(ByteReader& data,
 		int nalu_count = (int)BytesToInt(data.ReadBytes(2), 2); //The number of nalus in single array
 		for (int j = 0; j < nalu_count; j++)
 		{
-			std::shared_ptr<HevcNaluBase> nalu = std::make_shared<HevcNaluBase>(data, 2, demux_output);
-			nalu_list_.push_back(nalu);
+			uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(2), 2);
+			std::shared_ptr<HevcNaluBase> nalu = HevcNaluBase::Create(data, nalu_size, demux_output);
+			if (nalu)
+				nalu_list_.push_back(nalu);
 		}
 	}
 	if (nalu_list_.empty())
