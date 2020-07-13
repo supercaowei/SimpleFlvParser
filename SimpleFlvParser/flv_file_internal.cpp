@@ -1749,8 +1749,8 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 	{
 	case HevcNaluTypeSEI:
 	case HevcNaluTypeSEISuffix:
-		// nalu = std::make_shared<HevcNaluSEI>(data, nalu_size, demux_output);
-		// break;
+		nalu = std::make_shared<HevcNaluSEI>(data, nalu_size, demux_output);
+		break;
 	default:
 		nalu = std::make_shared<HevcNaluBase>(data, nalu_size, demux_output);
 		break;
@@ -1919,7 +1919,13 @@ std::string HevcNaluSEI::CompleteInfo()
 std::string HevcNaluSEI::ExtraInfo()
 {
 	Json::Value extra_info;
-	extra_info["seis"] = hevc_seis_to_json(seis_, sei_num_);
+	Json::Value json_sei = hevc_seis_to_json(seis_, sei_num_);
+	if (print_sei) 
+	{
+		std::string sei = json_sei.toStyledString();
+		printf("%s\n", sei.c_str());
+	}
+	extra_info["seis"] = json_sei;
 	return extra_info.toStyledString();
 }
 

@@ -135,9 +135,13 @@ void read_hevc_sei_payload(hevc_sei_t* s, BitReader& b, int payloadType, int pay
 			s->payloadSize = payloadSize;
 		}
 		else
+		{
+			printf("Skipped SEI payload type %d\n", payloadType);
 			b.SkipBytes(payloadSize);
+		}
 	}
 
+	/* //ffmpeg都没管这一段
 	uint8_t* end = b.BytePos();
 	if (!b.IsByteAligned() || start + payloadSize > end) //There is more data in payload
 	{
@@ -151,7 +155,7 @@ void read_hevc_sei_payload(hevc_sei_t* s, BitReader& b, int payloadType, int pay
 			b.SkipU(reserved_payload_extension_data); //u(v)
 		}
 		read_sei_end_bits(b);
-	}
+	}*/
 }
 
 void read_hevc_sei_message(hevc_sei_t* sei, BitReader& b, int nal_unit_type)
