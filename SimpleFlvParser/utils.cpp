@@ -280,21 +280,20 @@ uint32_t BitReader::ReadU(int nbits)
 	return r;
 }
 
-void BitReader::SkipU(int nbis)
+void BitReader::SkipU(int nbits)
 {
-	if (nbis < bits_left_)
-	{
-		bits_left_ -= nbis;
-		return;
+	if ((end_ - p_ - 1) * 8 + bits_left_ <= nbits) {
+		p_ = end_; //reach end
+		bits_left_ = 8;
 	}
 
-	p_ -= 1 + (nbis - bits_left_) / 8;
-	bits_left_ = 8 - ((nbis - bits_left_) % 8);
-
-	if (Eof())
-	{
-		p_ = end_;
-		bits_left_ = 8;
+	p_ += nbits / 8;
+	nbits = nbits % 8;
+	if (nbits > bits_left_) {
+		p_++;
+		bits_left_ = 8 - (nbits - bits_left_);
+	} else {
+		bits_left_ -= nbits;
 	}
 }
 
@@ -356,7 +355,7 @@ int BitReader::ReadBytes(uint8_t* buf, int len)
 	else
 	{
 		for (int i = 0; i < actual_len; i++)
-			buf[i] = (uint8_t)ReadU(8);
+			buf[i] = (uint8_t)ReadU8();
 	}
 	
 	return actual_len;

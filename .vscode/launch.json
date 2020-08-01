@@ -9,11 +9,11 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/macos_build/bin/SimpleFlvParser",
-            "args": ["-i", "/Users/caowei/Desktop/stream-107014340310728735.flv", "-vcopy", "/Users/caowei/Desktop/stream-107014340310728735.h265"],
+            "args": ["-i", "1.flv", "-vcopy", "1.h265"],
             // "args": ["-i", "/Users/caowei/Desktop/stream-107014340310728735_flv.h265", "-type", "h265", "-db", "/Users/caowei/Desktop/stream-107014340310728735_h265.db"],
             // "args": ["-i", "/Users/caowei/Desktop/stream-107011693066321958.flv", "-db", "/Users/caowei/Desktop/stream-107011693066321958.db"],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "/Users/caowei/temp",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"

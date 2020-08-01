@@ -122,21 +122,23 @@ void read_hevc_sei_payload(hevc_sei_t* s, BitReader& b, int payloadType, int pay
 		if (payloadType == 5) //we only want "User data unregistered SEI"
 		{
 			b.SkipU(128); //uuid_iso_iec_11578
-			s->payload = (uint8_t*)malloc(payloadSize - 16);
+			s->payload = (uint8_t*)malloc(payloadSize - 16 + 1);
 			for (int i = 0; i < payloadSize - 16; i++)
-				s->payload[i] = b.ReadU(8);
+				s->payload[i] = b.ReadU8();
+			s->payload[payloadSize - 16] = 0; //'\0'
 			s->payloadSize = payloadSize - 16;
 		}
 		else if (payloadType == 100)
 		{
-			s->payload = (uint8_t*)malloc(payloadSize);
+			s->payload = (uint8_t*)malloc(payloadSize + 1);
 			for (int i = 0; i < payloadSize; i++)
-				s->payload[i] = b.ReadU(8);
+				s->payload[i] = b.ReadU8();
+			s->payload[payloadSize] = 0; //'\0'
 			s->payloadSize = payloadSize;
 		}
 		else
 		{
-			printf("Skipped SEI payload type %d\n", payloadType);
+			printf("Warning: Skipped SEI payload type %d, payload size %d.\n", payloadType, payloadSize);
 			b.SkipBytes(payloadSize);
 		}
 	}
@@ -173,11 +175,15 @@ hevc_sei_t** read_hevc_sei_rbsp(uint32_t *num_seis, BitReader& b, int nal_unit_t
 	hevc_sei_t **seis = NULL;
 	*num_seis = 0;
 	do {
+		hevc_sei_t* sei = hevc_sei_new();
+		read_hevc_sei_message(sei, b, nal_unit_type);
+		if (!sei->payload || sei->payloadSize <= 0) {
+			hevc_sei_free(sei);
+			continue;
+		}
 		(*num_seis)++;
 		seis = (hevc_sei_t**)realloc(seis, (*num_seis) * sizeof(hevc_sei_t*));
-		seis[*num_seis - 1] = hevc_sei_new();
-		hevc_sei_t* sei = seis[*num_seis - 1];
-		read_hevc_sei_message(sei, b, nal_unit_type);
+		seis[*num_seis - 1] = sei;
 	} while (more_rbsp_data(b));
 	read_rbsp_trailing_bits(b);
 
