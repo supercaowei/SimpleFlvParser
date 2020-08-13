@@ -16,7 +16,8 @@
             "cwd": "/Users/caowei/temp",
             "environment": [],
             "externalConsole": false,
-            "MIMode": "lldb"
+            "MIMode": "lldb",
+            "preLaunchTask": "build"
         }
     ]
 }

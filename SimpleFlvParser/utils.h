@@ -68,4 +68,15 @@ private:
 	uint8_t bits_left_ = 0; //how many bits left in the byte pointed by p_
 };
 
+#ifndef PRINT_MEM
+#define PRINT_MEM(memAddr, sizeInBytes) \
+{\
+	printf("%s first %d bytes memory: 0x ", #memAddr, sizeInBytes); \
+	for (int i = 0; i < sizeInBytes; i++) {\
+		printf("%02x ", *((unsigned char*)memAddr + i));\
+	}\
+	printf("\n");\
+}
+#endif
+
 #endif

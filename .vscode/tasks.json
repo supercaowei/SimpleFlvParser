@@ -2,17 +2,8 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "clang++ build active file",
-            "command": "/usr/bin/clang++",
-            "args": [
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
-            ],
-            "options": {
-                "cwd": "/usr/bin"
-            }
+            "label": "build",
+            "command": "cd ${workspaceFolder}/macos_build/ && make && cd -",
         }
     ],
     "version": "2.0.0"

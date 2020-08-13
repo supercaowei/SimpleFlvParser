@@ -34,7 +34,7 @@ int hevc_nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, i
 			// check the 4th byte after 0x000003, except when cabac_zero_word is used, in which case the last three bytes of this NAL unit must be 0x000003
 			if ((i < *nal_size - 1) && (nal_buf[i + 1] > 0x03))
 			{
-				return -1;
+				return -2;
 			}
 
 			// if cabac_zero_word is used, the final byte of this NAL unit(0x03) is discarded, and the last two bytes of RBSP must be 0x0000
@@ -50,7 +50,7 @@ int hevc_nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, i
 		if (j >= *rbsp_size)
 		{
 			// error, not enough space
-			return -1;
+			return -3;
 		}
 
 		rbsp_buf[j] = nal_buf[i];
