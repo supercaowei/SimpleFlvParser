@@ -69,9 +69,9 @@ private:
 };
 
 #ifndef PRINT_MEM
-#define PRINT_MEM(memAddr, sizeInBytes) \
+#define PRINT_MEM(desc, memAddr, sizeInBytes) \
 {\
-	printf("%s first %d bytes memory: 0x ", #memAddr, sizeInBytes); \
+	printf("%s: %s first %d bytes memory: 0x ", desc, #memAddr, sizeInBytes); \
 	for (int i = 0; i < sizeInBytes; i++) {\
 		printf("%02x ", *((unsigned char*)memAddr + i));\
 	}\

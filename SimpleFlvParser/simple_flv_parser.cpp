@@ -155,7 +155,7 @@ int parse_args(int argc, char* argv[])
 		}
 	}
 
-	if (iuput_file.empty() || (db_file.empty() && txt_file.empty() && h26x_file.empty() && aac_file.empty()))
+	if (iuput_file.empty() || (db_file.empty() && txt_file.empty() && h26x_file.empty() && aac_file.empty() && !print_sei))
 		goto help;
 
 	if (!FilePathIsExist(iuput_file, false))

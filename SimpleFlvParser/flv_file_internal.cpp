@@ -1399,6 +1399,19 @@ NaluSEI::NaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<Dem
 	ReleaseRbsp();
 	if (!seis_ || !sei_num_)
 		return;
+
+	if (print_sei) 
+	{
+		for (int i = 0; i < sei_num_; i++) {
+			if (seis_[i] && seis_[i]->payloadSize > 0 && seis_[i]->payload)
+				printf("Sei %d payload type: %d, payload size: %d, content: %s\n", i, seis_[i]->payloadType, seis_[i]->payloadSize, seis_[i]->payload);
+			else if (!seis_[i])
+				printf("Sei %d is NULL\n", i);
+			else 
+				printf("Sei %d payload type: %d, payload size: %d, payload: %p\n", i, seis_[i]->payloadType, seis_[i]->payloadSize, seis_[i]->payload);
+		}
+	}
+
 	is_good_ = true;
 }
 
@@ -1420,13 +1433,7 @@ std::string NaluSEI::CompleteInfo()
 std::string NaluSEI::ExtraInfo()
 {
 	Json::Value extra_info;
-	Json::Value json_sei = seis_to_json(seis_, sei_num_);
-	if (print_sei) 
-	{
-		std::string sei = json_sei.toStyledString();
-		printf("%s\n", sei.c_str());
-	}
-	extra_info["seis"] = json_sei;
+	extra_info["seis"] = seis_to_json(seis_, sei_num_);
 	return extra_info.toStyledString();
 }
 
@@ -1898,6 +1905,19 @@ HevcNaluSEI::HevcNaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared
 	ReleaseRbsp();
 	if (!seis_ || !sei_num_)
 		return;
+
+	if (print_sei) 
+	{
+		for (int i = 0; i < sei_num_; i++) {
+			if (seis_[i] && seis_[i]->payloadSize > 0 && seis_[i]->payload)
+				printf("Sei %d payload type: %d, payload size: %d, content: %s\n", i, seis_[i]->payloadType, seis_[i]->payloadSize, seis_[i]->payload);
+			else if (!seis_[i])
+				printf("Sei %d is NULL\n", i);
+			else 
+				printf("Sei %d payload type: %d, payload size: %d, payload: %p\n", i, seis_[i]->payloadType, seis_[i]->payloadSize, seis_[i]->payload);
+		}
+	}
+
 	is_good_ = true;
 }
 
@@ -1919,13 +1939,7 @@ std::string HevcNaluSEI::CompleteInfo()
 std::string HevcNaluSEI::ExtraInfo()
 {
 	Json::Value extra_info;
-	Json::Value json_sei = hevc_seis_to_json(seis_, sei_num_);
-	if (print_sei) 
-	{
-		std::string sei = json_sei.toStyledString();
-		printf("%s\n", sei.c_str());
-	}
-	extra_info["seis"] = json_sei;
+	extra_info["seis"] = hevc_seis_to_json(seis_, sei_num_);
 	return extra_info.toStyledString();
 }
 
