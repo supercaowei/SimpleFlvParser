@@ -226,3 +226,37 @@ Json::Value hevc_seis_to_json(hevc_sei_t** seis, uint32_t num_seis)
 
 	return json_seis;
 }
+
+//see 7.3.2.9 Slice segment layer RBSP syntax
+//and 7.3.6.1 General slice segment header syntax
+void hevc_slice_segment_header(hevc_slice_header_t* sh, BitReader& b, uint8_t nal_unit_type) 
+{
+	sh->first_slice_segment_in_pic_flag = -1;
+	//see H.265 Table 7-1 – NAL unit type codes and NAL unit type classes
+	if(nal_unit_type == HevcNaluTypeCodedSliceTrailN || 
+		nal_unit_type == HevcNaluTypeCodedSliceTrailR || 
+		nal_unit_type == HevcNaluTypeCodedSliceTSAN || 
+		nal_unit_type == HevcNaluTypeCodedSliceTLA || 
+		nal_unit_type == HevcNaluTypeCodedSliceSTSAN || 
+		nal_unit_type == HevcNaluTypeCodedSliceSTSAR || 
+		nal_unit_type == HevcNaluTypeCodedSliceRADLN || 
+		nal_unit_type == HevcNaluTypeCodedSliceDLP || 
+		nal_unit_type == HevcNaluTypeCodedSliceRASLN || 
+		nal_unit_type == HevcNaluTypeCodedSliceTFD || 
+		nal_unit_type == HevcNaluTypeCodedSliceBLA || 
+		nal_unit_type == HevcNaluTypeCodedSliceBLANT || 
+		nal_unit_type == HevcNaluTypeCodedSliceBLANLP || 
+		nal_unit_type == HevcNaluTypeCodedSliceIDR || 
+		nal_unit_type == HevcNaluTypeCodedSliceIDRNLP || 
+		nal_unit_type == HevcNaluTypeCodedSliceCRA) 
+	{
+		sh->first_slice_segment_in_pic_flag = b.ReadU1();
+	}
+}
+
+Json::Value hevc_slice_segment_header_to_json(hevc_slice_header_t* sh)
+{
+	Json::Value json_slice_header;
+	json_slice_header["first_slice_segment_in_pic_flag"] = sh->first_slice_segment_in_pic_flag;
+	return json_slice_header;
+}

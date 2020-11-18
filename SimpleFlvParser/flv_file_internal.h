@@ -657,6 +657,16 @@ private:
 	uint32_t sei_num_ = 0;
 };
 
+class HevcNaluSlice : public HevcNaluBase
+{
+public:
+	HevcNaluSlice(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	virtual std::string CompleteInfo() override;
+
+private:
+	std::shared_ptr<hevc_slice_header_t> slice_header_;
+};
+
 class VideoTagBodyHEVCNalu : public VideoTagBody
 {
 public:

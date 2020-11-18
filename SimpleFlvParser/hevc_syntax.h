@@ -5,6 +5,7 @@
 #include <string>
 #include "json/value.h"
 
+//see Table 7-1 – NAL unit type codes and NAL unit type classes
 enum HevcNaluType
 {
 	HevcNaluTypeUnknown = -1,
@@ -27,7 +28,7 @@ enum HevcNaluType
 	HevcNaluTypeReserved15,
 
 	HevcNaluTypeCodedSliceBLA, 			// 16 // Current name in the spec: BLA_W_LP
-	HevcNaluTypeCodedSliceBLANT, 		// 17 // Current name in the spec: BLA_W_DLP
+	HevcNaluTypeCodedSliceBLANT, 		// 17 // Current name in the spec: BLA_W_DLP or BLA_W_RADL
 	HevcNaluTypeCodedSliceBLANLP,  		// 18
 	HevcNaluTypeCodedSliceIDR,	  		// 19 // Current name in the spec: IDR_W_DLP
 	HevcNaluTypeCodedSliceIDRNLP, 		// 20
@@ -79,6 +80,13 @@ enum HevcNaluType
 	HevcNaluTypeInvalid,
 };
 
+//see 7.3.2.9 Slice segment layer RBSP syntax
+//and 7.3.6.1 General slice segment header syntax
+typedef struct
+{
+	int first_slice_segment_in_pic_flag;
+} hevc_slice_header_t;
+
 typedef struct
 {
 	int payloadType;
@@ -87,6 +95,10 @@ typedef struct
 } hevc_sei_t;
 
 class BitReader;
+
+void hevc_slice_segment_header(hevc_slice_header_t* sh, BitReader& b, uint8_t nal_unit_type);
+
+Json::Value hevc_slice_segment_header_to_json(hevc_slice_header_t* sh);
 
 int  hevc_nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, int* rbsp_size);
 

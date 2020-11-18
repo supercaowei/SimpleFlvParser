@@ -1754,6 +1754,25 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 	HevcNaluHeader nalu_header((uint16_t)BytesToInt(data.CurrentPos(), 2)); //just peek 2 bytes
 	switch (nalu_header.nal_unit_type_)
 	{
+	//see H.265 Table 7-1 – NAL unit type codes and NAL unit type classes
+	case HevcNaluTypeCodedSliceTrailN:
+	case HevcNaluTypeCodedSliceTrailR:
+	case HevcNaluTypeCodedSliceTSAN:
+	case HevcNaluTypeCodedSliceTLA:
+	case HevcNaluTypeCodedSliceSTSAN:
+	case HevcNaluTypeCodedSliceSTSAR:
+	case HevcNaluTypeCodedSliceRADLN:
+	case HevcNaluTypeCodedSliceDLP:
+	case HevcNaluTypeCodedSliceRASLN:
+	case HevcNaluTypeCodedSliceTFD:
+	case HevcNaluTypeCodedSliceBLA:
+	case HevcNaluTypeCodedSliceBLANT:
+	case HevcNaluTypeCodedSliceBLANLP:
+	case HevcNaluTypeCodedSliceIDR:
+	case HevcNaluTypeCodedSliceIDRNLP:
+	case HevcNaluTypeCodedSliceCRA:
+		nalu = std::make_shared<HevcNaluSlice>(data, nalu_size, demux_output);
+		break;
 	case HevcNaluTypeSEI:
 	case HevcNaluTypeSEISuffix:
 		nalu = std::make_shared<HevcNaluSEI>(data, nalu_size, demux_output);
@@ -1941,6 +1960,35 @@ std::string HevcNaluSEI::ExtraInfo()
 	Json::Value extra_info;
 	extra_info["seis"] = hevc_seis_to_json(seis_, sei_num_);
 	return extra_info.toStyledString();
+}
+
+HevcNaluSlice::HevcNaluSlice(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_size, demux_output) 
+{
+	if (!is_good_) //NaluBase parse error
+		return;
+	is_good_ = false;
+
+	slice_header_ = std::make_shared<hevc_slice_header_t>();
+	memset(slice_header_.get(), 0, sizeof(hevc_slice_header_t));
+	BitReader rbsp_data(rbsp_, rbsp_size_);
+	hevc_slice_segment_header(slice_header_.get(), rbsp_data, nalu_header_->nal_unit_type_);
+	if (slice_header_->first_slice_segment_in_pic_flag == 0)
+	{
+		printf("Warning: multi-slice!\n");
+	}
+	ReleaseRbsp();
+	is_good_ = true;
+}
+
+std::string HevcNaluSlice::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(HevcNaluBase::CompleteInfo(), json_nalu);
+	if (slice_header_)
+		json_nalu["slice_header"] = hevc_slice_segment_header_to_json(slice_header_.get());
+	return json_nalu.toStyledString();
 }
 
 VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
