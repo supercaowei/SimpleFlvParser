@@ -20,6 +20,7 @@ std::string txt_file;
 std::string h26x_file;
 std::string aac_file;
 bool print_sei = false;
+FILE* unknown_nalu_type_dump = NULL;
 
 int main(int argc, char* argv[])
 {
@@ -81,6 +82,11 @@ int main(int argc, char* argv[])
 			if (h265)
 				h265->Output(nalu_cb);
 		}
+	}
+
+	if (unknown_nalu_type_dump)
+	{
+		fclose(unknown_nalu_type_dump);
 	}
 
 	return 0;

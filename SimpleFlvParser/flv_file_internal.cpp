@@ -10,6 +10,7 @@
 #define STRING_UNKNOWN "Unknown"
 
 extern bool print_sei;
+extern FILE* unknown_nalu_type_dump;
 
 FlvHeader::FlvHeader(ByteReader& data)
 {
@@ -1014,6 +1015,7 @@ std::shared_ptr<VideoTagBody> VideoTagBody::Create(ByteReader& data, FlvVideoCod
 
 std::string GetNaluTypeString(NaluType type)
 {
+	char s[20] = {0};
 	switch (type)
 	{
 	case NaluTypeUnused:
@@ -1047,8 +1049,33 @@ std::string GetNaluTypeString(NaluType type)
 	case NaluTypeSliceAux:
 		return "Aux Slice";
 	default:
-		return STRING_UNKNOWN;
+		sprintf(s, "Unknown NALU type %d", (int)type);
+		return s;
 	}
+}
+
+bool IsNormalNaluType(NaluType type) 
+{
+	switch (type)
+	{
+	case NaluTypeUnused:
+	case NaluTypeNonIDR:
+	case NaluTypeSliceDPA:
+	case NaluTypeSliceDPB:
+	case NaluTypeSliceDPC:
+	case NaluTypeIDR:
+	case NaluTypeSEI:
+	case NaluTypeSPS:
+	case NaluTypePPS:
+	case NaluTypeAUD:
+	case NaluTypeSeqEnd:
+	case NaluTypeStreamEnd:
+	case NaluTypeFillerData:
+	case NaluTypeSPSExt:
+	case NaluTypeSliceAux:
+		return true;
+	}
+	return false;
 }
 
 NaluHeader::NaluHeader(uint8_t b)
@@ -1119,6 +1146,17 @@ NaluBase::NaluBase(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<D
 
 	//parse nalu header
 	nalu_header_ = std::make_shared<NaluHeader>(*data.ReadBytes(1, false)); //just peek
+
+	if (!IsNormalNaluType(nalu_header_->nal_unit_type_)) {
+		if (!unknown_nalu_type_dump) {
+			unknown_nalu_type_dump = fopen("./unknown_nalu_type_dump", "wb");
+		}
+		std::string s1 = GetNaluTypeString(nalu_header_->nal_unit_type_) + ", [nalu start]";
+		fwrite(s1.c_str(), s1.length(), 1, unknown_nalu_type_dump);
+		fwrite(data.CurrentPos(), nalu_size_, 1, unknown_nalu_type_dump);
+		std::string s2 = "[nalu end]                ";
+		fwrite(s2.c_str(), s2.length(), 1, unknown_nalu_type_dump);
+	}
 
 	//allocate memory and transfer nal to rbsp
 	rbsp_size_ = nalu_size_;
