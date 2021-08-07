@@ -1,6 +1,7 @@
 #include "flv_file_internal.h"
 #include "utils.h"
 #include "json/reader.h"
+#include "sstream"
 
 #define FLV_HEADER_SIZE           9
 #define PREVIOUS_TAG_SIZE_SIZE    4
@@ -324,8 +325,22 @@ void FlvTagDataScript::DecodeAMF(const AMFObject* amf, Json::Value& json)
 	}
 }
 
+int audioTagCount = 0;
+
 FlvTagDataAudio::FlvTagDataAudio(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
 {
+	printf("audio tag NO. %d. size %u, content: \n", ++audioTagCount, data.RemainingSize());
+	std::ostringstream oss("");
+	char buff[4] = {0};
+	for (int i = 0; i < data.RemainingSize(); i++) {
+		sprintf(buff, "%02X \0", *(data.CurrentPos() + i));
+		oss << buff;
+		if ((i % 16) == 15 && i < data.RemainingSize() - 1) {
+			oss << "\n";
+		}
+	}
+	printf("%s\n\n", oss.str().c_str());
+
 	audio_tag_header_ = std::make_shared<AudioTagHeader>(data);
 	if (!audio_tag_header_ || !audio_tag_header_->is_good_)
 		return;
