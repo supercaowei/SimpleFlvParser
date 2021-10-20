@@ -1443,9 +1443,36 @@ VideoTagBodyAVCNalu::VideoTagBodyAVCNalu(ByteReader& data, const std::shared_ptr
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 
+	bool avccFormat = true;
 	while (data.RemainingSize() > 4)
 	{
-		uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(4), 4);
+		int nalu_size = avccFormat ? BytesToInt(data.ReadBytes(4), 4) : 1;
+		if (nalu_size == 1) {
+			if (avccFormat) { //the start code is already read
+				avccFormat = false;
+				printf("Warning: The nalu format in flv should be avcc/hvcc, but here may be annex-b.\n");
+			} else { //skip the start code at data.CurrentPos()
+				uint8_t b = 0;
+				uint8_t zeroCount = 0;
+				while (data.RemainingSize() > 0 && (b = *data.ReadBytes(1)) == 0)
+					zeroCount++;
+				assert((zeroCount == 2 || zeroCount == 3) && b == 1);
+			}
+
+			//find next start code or reach the data end
+			uint8_t* ptr = data.CurrentPos();
+			uint8_t* end = data.CurrentPos() + data.RemainingSize();
+			for (; ptr < end; ptr++) {
+				if (ptr + 3 < end && ptr[0] == 0 && ptr[1] == 0 && ((ptr[2] == 0 && ptr[3] == 1) || ptr[2] == 1)) {
+					break;
+				}
+			}
+			nalu_size = ptr - data.CurrentPos();
+			if (nalu_size <= 0) {
+				break;
+			}
+		}
+
 		std::shared_ptr<NaluBase> nalu = NaluBase::Create(data, nalu_size, demux_output);
 		if (!nalu || !nalu->IsNoBother())
 			break;
@@ -1997,9 +2024,36 @@ VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_p
 		return;
 	cts_ = (uint32_t)BytesToInt(data.ReadBytes(3), 3);
 
+	bool hvccFormat = true;
 	while (data.RemainingSize() > 4)
 	{
-		uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(4), 4);
+		int nalu_size = hvccFormat ? BytesToInt(data.ReadBytes(4), 4) : 1;
+		if (nalu_size == 1) {
+			if (hvccFormat) { //the start code is already read
+				hvccFormat = false;
+				printf("Warning: The nalu format in flv should be avcc/hvcc, but here may be annex-b.\n");
+			} else { //skip the start code at data.CurrentPos()
+				uint8_t b = 0;
+				uint8_t zeroCount = 0;
+				while (data.RemainingSize() > 0 && (b = *data.ReadBytes(1)) == 0)
+					zeroCount++;
+				assert((zeroCount == 2 || zeroCount == 3) && b == 1);
+			}
+
+			//find next start code or reach the data end
+			uint8_t* ptr = data.CurrentPos();
+			uint8_t* end = data.CurrentPos() + data.RemainingSize();
+			for (; ptr < end; ptr++) {
+				if (ptr + 3 < end && ptr[0] == 0 && ptr[1] == 0 && ((ptr[2] == 0 && ptr[3] == 1) || ptr[2] == 1)) {
+					break;
+				}
+			}
+			nalu_size = ptr - data.CurrentPos();
+			if (nalu_size <= 0) {
+				break;
+			}
+		}
+
 		std::shared_ptr<HevcNaluBase> nalu = HevcNaluBase::Create(data, nalu_size, demux_output);
 		if (!nalu)
 			break;
@@ -2038,10 +2092,30 @@ HEVCDecoderConfigurationRecord::HEVCDecoderConfigurationRecord(ByteReader& data,
 	data.ReadBytes(22); //The first 22 bytes of HEVCDecoderConfigurationRecord are various flags and info
 
 	int array_count = *data.ReadBytes(1); //The 23rd byte (index 22) is the number of nalu arrays
+	if (array_count <= 0 || array_count > 3) {
+		printf("Parse HEVCDecoderConfigurationRecord error: array_count %d\n", array_count);
+		return;
+	}
+
 	for (int i = 0; i < array_count; i++)
 	{
-		data.ReadBytes(1);
+		uint8_t b = *data.ReadBytes(1);
+		uint8_t array_completeness = (b & 0x80) >> 7; //I see this is 0 in all hevc
+		uint8_t reserved = (b & 0x40) >> 6;
+		HevcNaluType nalu_type = (HevcNaluType)(b & 0x3f);
+		if (reserved != 0 || (nalu_type != HevcNaluTypeVPS && nalu_type != HevcNaluTypeSPS && nalu_type != HevcNaluTypePPS)) {
+			std::string nalu_type_string = GetHevcNaluTypeString(nalu_type);
+			printf("Parse HEVCDecoderConfigurationRecord error: array_completeness %d, reserved %d, nal_unit_type %s\n", 
+				array_completeness, reserved, nalu_type_string.c_str());
+			return;
+		}
+
 		int nalu_count = (int)BytesToInt(data.ReadBytes(2), 2); //The number of nalus in single array
+		if (nalu_count <= 0 || nalu_count > 3) {
+			printf("Parse HEVCDecoderConfigurationRecord error: nalu_count %d\n", nalu_count);
+			return;
+		}
+
 		for (int j = 0; j < nalu_count; j++)
 		{
 			uint32_t nalu_size = (uint32_t)BytesToInt(data.ReadBytes(2), 2);

@@ -682,6 +682,54 @@ private:
 	std::list<std::shared_ptr<HevcNaluBase> > nalu_list_;
 };
 
+/** 
+ * The CodecPrivate syntax shall follow the
+ * syntax of HEVCDecoderConfigurationRecord
+ * defined in ISO/IEC 14496-15.
+ *
+ * The number zero (0) shall be written to
+ * the configurationVersion variable until
+ * official finalization of 14496-15, 3rd ed.
+ *
+ * After its finalization, this field and the
+ * following CodecPrivate structure shall
+ * follow the definition of the
+ * HEVCDecoderConfigurationRecord in 14496-15.
+
+unsigned int(8)  configurationVersion;
+unsigned int(2)  general_profile_space;
+unsigned int(1)  general_tier_flag;
+unsigned int(5)  general_profile_idc;
+unsigned int(32) general_profile_compatibility_flags;
+unsigned int(48) general_constraint_indicator_flags;
+unsigned int(8)  general_level_idc;
+bit(4) reserved = ‘1111’b;
+unsigned int(12) min_spatial_segmentation_idc;
+bit(6) reserved = ‘111111’b;
+unsigned int(2)  parallelismType;
+bit(6) reserved = ‘111111’b;
+unsigned int(2)  chromaFormat;
+bit(5) reserved = ‘11111’b;
+unsigned int(3)  bitDepthLumaMinus8;
+bit(5) reserved = ‘11111’b;
+unsigned int(3)  bitDepthChromaMinus8;
+bit(16) avgFrameRate;
+bit(2)  constantFrameRate;
+bit(3)  numTemporalLayers;
+bit(1)  temporalIdNested;
+unsigned int(2) lengthSizeMinusOne; //all above are 22 bytes (176 bits)
+unsigned int(8) numOfArrays;
+for (j=0; j < numOfArrays; j++) {
+    bit(1) array_completeness;
+    unsigned int(1)  reserved = 0;
+    unsigned int(6)  NAL_unit_type;
+    unsigned int(16) numNalus;
+    for (i=0; i< numNalus; i++) {
+        unsigned int(16) nalUnitLength;
+        bit(8*nalUnitLength) nalUnit;
+    }
+}
+*/
 struct HEVCDecoderConfigurationRecord
 {
 	std::list<std::shared_ptr<HevcNaluBase> > nalu_list_;
