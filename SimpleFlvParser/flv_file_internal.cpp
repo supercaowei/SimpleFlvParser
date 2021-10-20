@@ -1063,39 +1063,43 @@ std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint32_t nalu_size,
 {
 	if (data.RemainingSize() < nalu_size || nalu_size <= 1) {
 		printf("data remaining size %d, nalu size %d\n", data.RemainingSize(), nalu_size);
-		return NULL;
+		data.ReadBytes(data.RemainingSize());
+		return nullptr;
 	}
 
+	ByteReader nalu_data(data.CurrentPos(), nalu_size);
+	data.ReadBytes(nalu_size);
+
 	std::shared_ptr<NaluBase> nalu;
-	uint8_t nalu_header = *data.ReadBytes(1, false); //just peek 1 byte
+	uint8_t nalu_header = *nalu_data.ReadBytes(1, false); //just peek 1 byte
 	NaluType nalu_type = (NaluType)(nalu_header & 0x1f);
 	switch (nalu_type)
 	{
 	case NaluTypeNonIDR:
 	case NaluTypeIDR:
 	case NaluTypeSliceAux:
-		nalu = std::make_shared<NaluSlice>(data, nalu_size, demux_output);
+		nalu = std::make_shared<NaluSlice>(nalu_data, nalu_size, demux_output);
 		break;
 	case NaluTypeSEI:
-		nalu = std::make_shared<NaluSEI>(data, nalu_size, demux_output);
+		nalu = std::make_shared<NaluSEI>(nalu_data, nalu_size, demux_output);
 		break;
 	case NaluTypeSPS:
-		CurrentSps = std::make_shared<NaluSps>(data, nalu_size, demux_output);
+		CurrentSps = std::make_shared<NaluSps>(nalu_data, nalu_size, demux_output);
 		nalu = CurrentSps;
 		break;
 	case NaluTypePPS:
-		CurrentPps = std::make_shared<NaluPps>(data, nalu_size, demux_output);
+		CurrentPps = std::make_shared<NaluPps>(nalu_data, nalu_size, demux_output);
 		nalu = CurrentPps;
 		break;
 	default:
-		nalu = std::make_shared<NaluBase>(data, nalu_size, demux_output);
+		nalu = std::make_shared<NaluBase>(nalu_data, nalu_size, demux_output);
 		break;
 	}
 
 	if (nalu && !nalu->IsGood()) {
 		std::string nalu_type_string = GetNaluTypeString(nalu->GetNaluHeader()->nal_unit_type_);
 		printf("nalu 0x%p (type: %s, size: %d) is not good\n", nalu.get(), nalu_type_string.c_str(), nalu->NaluSize());
-		nalu = NULL;
+		nalu = nullptr;
 	}
 
 	return nalu;
@@ -1774,11 +1778,15 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 {
 	if (data.RemainingSize() < nalu_size || nalu_size <= 2) {
 		printf("data remaining size %d, nalu size %d\n", data.RemainingSize(), nalu_size);
-		return NULL;
+		data.ReadBytes(data.RemainingSize());
+		return nullptr;
 	}
 
+	ByteReader nalu_data(data.CurrentPos(), nalu_size);
+	data.ReadBytes(nalu_size);
+
 	std::shared_ptr<HevcNaluBase> nalu;
-	HevcNaluHeader nalu_header((uint16_t)BytesToInt(data.CurrentPos(), 2)); //just peek 2 bytes
+	HevcNaluHeader nalu_header((uint16_t)BytesToInt(nalu_data.CurrentPos(), 2)); //just peek 2 bytes
 	switch (nalu_header.nal_unit_type_)
 	{
 	//see H.265 Table 7-1 – NAL unit type codes and NAL unit type classes
@@ -1798,21 +1806,21 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 	case HevcNaluTypeCodedSliceIDR:
 	case HevcNaluTypeCodedSliceIDRNLP:
 	case HevcNaluTypeCodedSliceCRA:
-		nalu = std::make_shared<HevcNaluSlice>(data, nalu_size, demux_output);
+		nalu = std::make_shared<HevcNaluSlice>(nalu_data, nalu_size, demux_output);
 		break;
 	case HevcNaluTypeSEI:
 	case HevcNaluTypeSEISuffix:
-		nalu = std::make_shared<HevcNaluSEI>(data, nalu_size, demux_output);
+		nalu = std::make_shared<HevcNaluSEI>(nalu_data, nalu_size, demux_output);
 		break;
 	default:
-		nalu = std::make_shared<HevcNaluBase>(data, nalu_size, demux_output);
+		nalu = std::make_shared<HevcNaluBase>(nalu_data, nalu_size, demux_output);
 		break;
 	}
 
 	if (nalu && !nalu->IsGood()) {
 		std::string nalu_type_string = GetHevcNaluTypeString(nalu_header.nal_unit_type_);
 		printf("nalu 0x%p (type: %s, size: %d) is not good\n", nalu.get(), nalu_type_string.c_str(), nalu->NaluSize());
-		nalu = NULL;
+		nalu = nullptr;
 	}
 
 	return nalu;
