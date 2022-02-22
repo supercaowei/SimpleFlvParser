@@ -20,6 +20,7 @@ std::string txt_file;
 std::string h26x_file;
 std::string aac_file;
 bool print_sei = false;
+bool print_metadata = false;
 
 int main(int argc, char* argv[])
 {
@@ -127,9 +128,13 @@ int parse_args(int argc, char* argv[])
 			else
 				txt_file = argv[++i];
 		}
-		else if (strcmp(argv[i], "-printsei") == 0)
+		else if (strcmp(argv[i], "-print_sei") == 0)
 		{
 			print_sei = true;
+		}
+		else if (strcmp(argv[i], "-print_metadata") == 0)
+		{
+			print_metadata = true;
 		}
 		else if (strcmp(argv[i], "-vcopy") == 0)
 		{
@@ -155,7 +160,7 @@ int parse_args(int argc, char* argv[])
 		}
 	}
 
-	if (iuput_file.empty() || (db_file.empty() && txt_file.empty() && h26x_file.empty() && aac_file.empty() && !print_sei))
+	if (iuput_file.empty() || (db_file.empty() && txt_file.empty() && h26x_file.empty() && aac_file.empty() && !print_sei && !print_metadata))
 		goto help;
 
 	if (!FilePathIsExist(iuput_file, false))
@@ -174,12 +179,16 @@ help:
 void print_help()
 {
 	printf("SimpleFlvParser usage: \n");
-	printf("\tSimpleFlvParser -i <input flv file> [-type flv|h264|h265] [-db <output db file>] [-txt <output text file>] [-printsei] [-vcopy <output h264/h265 file>] [-acopy <output aac file>]\n");
+	printf("\tSimpleFlvParser -i <input flv file> [-type flv|h264|h265] "\
+		"[-db <output db file>] [-txt <output text file>] "\
+		"[-print_sei] [-print_metadata] "
+		"[-vcopy <output h264/h265 file>] [-acopy <output aac file>]\n");
 	printf("\t-i <input flv file>: 输入的被解析文件路径\n");
 	printf("\t-type flv|h264|h265: 输入的文件类型，支持flv文件和annex-b格式的H264/H265文件\n");
 	printf("\t-db <output db file>: 输出db文件路径\n");
 	printf("\t-txt <output text file>: 输出文本文件路径\n");
-	printf("\t-printsei: 打印SEI内容\n");
+	printf("\t-print_sei: 打印SEI内容\n");
+	printf("\t-print_metadata: 打印metadata内容\n");
 	printf("\t-vcopy <output h264/h265 file>: 从flv中demux输出h264或h265文件的路径\n");
 	printf("\t-acopy <output aac file>: 从flv中demux输出aac文件的路径\n");
 }

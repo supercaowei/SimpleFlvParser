@@ -10,6 +10,7 @@
 #define STRING_UNKNOWN "Unknown"
 
 extern bool print_sei;
+extern bool print_metadata;
 
 FlvHeader::FlvHeader(ByteReader& data)
 {
@@ -271,6 +272,12 @@ FlvTagDataScript::FlvTagDataScript(ByteReader& data)
 	DecodeAMF(&amf, script_data_);
 	if (script_data_.isNull() || (!script_data_.isObject() && !script_data_.isArray()))
 		return;
+
+	if (print_metadata) 
+	{
+		std::string metadata = GetExtraInfo();
+		printf("metadata:\n%s\n", metadata.c_str());
+	}
 
 	is_good_ = true;
 }
