@@ -3,6 +3,8 @@
 
 #include "bytes.h"
 #include <string>
+#include <string.h>
+#include <assert.h>
 
 std::string  UnicodeToUTF8(const std::wstring& unicode_in);
 std::wstring UTF8ToUnicode(const std::string& utf8_in);
