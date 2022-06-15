@@ -1091,10 +1091,12 @@ std::shared_ptr<NaluBase> NaluBase::Create(ByteReader& data, uint32_t nalu_size,
 		nalu = std::make_shared<NaluSEI>(nalu_data, nalu_size, demux_output);
 		break;
 	case NaluTypeSPS:
+		PRINT_MEM("AVC SPS", nalu_data.CurrentPos(), nalu_size);
 		CurrentSps = std::make_shared<NaluSps>(nalu_data, nalu_size, demux_output);
 		nalu = CurrentSps;
 		break;
 	case NaluTypePPS:
+		PRINT_MEM("AVC PPS", nalu_data.CurrentPos(), nalu_size);
 		CurrentPps = std::make_shared<NaluPps>(nalu_data, nalu_size, demux_output);
 		nalu = CurrentPps;
 		break;
@@ -1819,6 +1821,15 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 	case HevcNaluTypeSEISuffix:
 		nalu = std::make_shared<HevcNaluSEI>(nalu_data, nalu_size, demux_output);
 		break;
+	case HevcNaluTypeVPS:
+	case HevcNaluTypeSPS:
+	case HevcNaluTypePPS:
+	{
+		const char* names[] = {"HEVC VPS", "HEVC SPS", "HEVC PPS"};
+		PRINT_MEM(names[nalu_header.nal_unit_type_ - HevcNaluTypeVPS], nalu_data.CurrentPos(), nalu_size);
+		nalu = std::make_shared<HevcNaluBase>(nalu_data, nalu_size, demux_output);
+		break;
+	}
 	default:
 		nalu = std::make_shared<HevcNaluBase>(nalu_data, nalu_size, demux_output);
 		break;
