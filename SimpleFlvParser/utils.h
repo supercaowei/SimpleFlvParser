@@ -3,6 +3,7 @@
 
 #include "bytes.h"
 #include <string>
+#include <vector>
 #include <string.h>
 #include <assert.h>
 
@@ -50,15 +51,17 @@ public:
 	uint32_t BytesLeft() { return Eof() ? 0 : (end_ - p_); }
 	uint8_t  BitsLeft() { return bits_left_; } //bits left in the byte pointed by p_, 1 << bits_left_ << 8
 
-	uint32_t ReadU1();
-	void SkipU1();
-	uint32_t PeekU1();
-	uint32_t ReadU(int nbits);
-	void SkipU(int nbis);
-	uint32_t ReadF(int nbits);
-	uint32_t ReadU8();
-	uint32_t ReadUE();
-	int32_t ReadSE();
+	//指数哥伦布编码
+	uint32_t ReadU1(); //u(1)
+	void SkipU1(); //u(1)
+	uint32_t PeekU1(); //u(1)
+	uint32_t ReadU(int nbits); //u(n)
+	void SkipU(int nbis); //u(n)
+	uint32_t ReadF(int nbits); //f(n)
+	uint32_t ReadU8(); //u(8)
+	uint32_t ReadUV(int toLog2); //u(v)
+	uint32_t ReadUE(); //ue(v)
+	int32_t ReadSE(); //se(v)
 	int ReadBytes(uint8_t* buf, int len);
 	int SkipBytes(int len);
 	uint32_t NextBits(int nbits);

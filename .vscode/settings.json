@@ -64,6 +64,11 @@
         "typeinfo": "cpp",
         "unordered_map": "cpp",
         "utility": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "__bits": "cpp",
+        "clocale": "cpp",
+        "variant": "cpp"
     }
 }

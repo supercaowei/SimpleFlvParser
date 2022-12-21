@@ -1393,7 +1393,8 @@ int NaluSlice::SliceQpDelta()
 
 std::string NaluSlice::ExtraInfo()
 {
-	return "";
+	return slice_header_to_json(slice_header_.get(), nalu_header_->nal_unit_type_, 
+			nalu_header_->nal_ref_idc_).toStyledString();
 }
 
 NaluSEI::NaluSEI(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
@@ -1781,6 +1782,9 @@ HevcNaluHeader::HevcNaluHeader(uint16_t b)
 	nal_unit_type_ = (HevcNaluType)((b >> 9) & 0x3F);
 }
 
+std::shared_ptr<HevcNaluBase> HevcNaluBase::CurrentVps;
+std::shared_ptr<HevcNaluBase> HevcNaluBase::CurrentSps;
+std::shared_ptr<HevcNaluBase> HevcNaluBase::CurrentPps;
 std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output)
 {
 	if (data.RemainingSize() < nalu_size || nalu_size <= 2) {
@@ -1815,6 +1819,18 @@ std::shared_ptr<HevcNaluBase> HevcNaluBase::Create(ByteReader& data, uint32_t na
 	case HevcNaluTypeCodedSliceCRA:
 		nalu = std::make_shared<HevcNaluSlice>(nalu_data, nalu_size, demux_output);
 		break;
+	case HevcNaluTypeVPS:
+		nalu = std::make_shared<HevcNaluVps>(nalu_data, nalu_size, demux_output);
+		CurrentVps = nalu;
+		break;
+	case HevcNaluTypeSPS:
+		nalu = std::make_shared<HevcNaluSps>(nalu_data, nalu_size, demux_output);
+		CurrentSps = nalu;
+		break;
+	case HevcNaluTypePPS:
+		nalu = std::make_shared<HevcNaluPps>(nalu_data, nalu_size, demux_output);
+		CurrentPps = nalu;
+		break;
 	case HevcNaluTypeSEI:
 	case HevcNaluTypeSEISuffix:
 		nalu = std::make_shared<HevcNaluSEI>(nalu_data, nalu_size, demux_output);
@@ -1842,15 +1858,22 @@ HevcNaluBase::HevcNaluBase(ByteReader& data, uint32_t nalu_size, const std::shar
 		return;
 	}
 
+	//parse nalu header
+	nalu_header_ = std::make_shared<HevcNaluHeader>((uint16_t)BytesToInt(data.CurrentPos(), 2));
+
 	if (demux_output)
 	{
+		//auto type = GetHevcNaluTypeString(nalu_header_->nal_unit_type_);
+		//printf("nalu type %s, nalu size %d\n", type.c_str(), nalu_size_);
+		// if (nalu_header_->nal_unit_type_ == HevcNaluTypeVPS || 
+		// 	nalu_header_->nal_unit_type_ == HevcNaluTypeSPS ||
+		// 	nalu_header_->nal_unit_type_ == HevcNaluTypePPS) {
+		// 	PRINT_MEM(type.c_str(), data.CurrentPos(), nalu_size_);
+		// }
 		static const uint8_t start_code[] = { 0x00, 0x00, 0x00, 0x01 };
 		demux_output->OnVideoNaluData(start_code, 4);
 		demux_output->OnVideoNaluData(data.CurrentPos(), nalu_size_);
 	}
-
-	//parse nalu header
-	nalu_header_ = std::make_shared<HevcNaluHeader>((uint16_t)BytesToInt(data.CurrentPos(), 2));
 
 	//allocate memory and transfer nal to rbsp
 	rbsp_size_ = nalu_size_;
@@ -1902,7 +1925,7 @@ uint32_t HevcNaluBase::NaluSize()
 
 uint8_t HevcNaluBase::NalRefIdc()
 {
-	return 0;
+	return -1;
 }
 
 std::string HevcNaluBase::NalUnitType()
@@ -1914,7 +1937,7 @@ std::string HevcNaluBase::NalUnitType()
 
 int8_t HevcNaluBase::FirstMbInSlice()
 {
-	return 0;
+	return -1;
 }
 
 std::string HevcNaluBase::SliceType()
@@ -1924,31 +1947,133 @@ std::string HevcNaluBase::SliceType()
 
 int HevcNaluBase::PicParameterSetId()
 {
-	return 0;
+	return -1;
 }
 
 int HevcNaluBase::FrameNum()
 {
-	return 0;
+	return -1;
 }
 
 int HevcNaluBase::FieldPicFlag()
 {
-	return 0;
+	return -1;
 }
 
 int HevcNaluBase::PicOrderCntLsb()
 {
-	return 0;
+	return -1;
 }
 
 int HevcNaluBase::SliceQpDelta()
 {
-	return 0;
+	return -1;
 }
 
 std::string HevcNaluBase::ExtraInfo()
 {
+	return "";
+}
+
+HevcNaluVps::HevcNaluVps(ByteReader& data, uint32_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_len_size, demux_output)
+{
+	if (!is_good_) //NaluBase parse error
+		return;
+	is_good_ = false;
+	if (nalu_header_->nal_unit_type_ != HevcNaluTypeVPS)
+		return;
+
+	vps_ = std::make_shared<hevc_vps_t>();
+	memset(vps_.get(), 0, sizeof(hevc_vps_t));
+	BitReader rbsp_data(rbsp_, rbsp_size_);
+	read_hevc_video_parameter_set_rbsp(vps_.get(), rbsp_data);
+	ReleaseRbsp();
+	is_good_ = true;
+}
+
+std::string HevcNaluVps::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(HevcNaluBase::CompleteInfo(), json_nalu);
+	if (vps_)
+		json_nalu["vps"] = hevc_vps_to_json(vps_.get());
+	return json_nalu.toStyledString();
+}
+
+std::string HevcNaluVps::ExtraInfo()
+{
+	if (vps_)
+		return hevc_vps_to_json(vps_.get()).toStyledString();
+	return "";
+}
+
+HevcNaluSps::HevcNaluSps(ByteReader& data, uint32_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_len_size, demux_output)
+{
+	if (!is_good_) //NaluBase parse error
+		return;
+	is_good_ = false;
+	if (nalu_header_->nal_unit_type_ != HevcNaluTypeSPS)
+		return;
+
+	sps_ = std::make_shared<hevc_sps_t>();
+	memset(sps_.get(), 0, sizeof(hevc_sps_t));
+	BitReader rbsp_data(rbsp_, rbsp_size_);
+	read_hevc_seq_parameter_set_rbsp(sps_.get(), rbsp_data);
+	ReleaseRbsp();
+	is_good_ = true;
+}
+
+std::string HevcNaluSps::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(HevcNaluBase::CompleteInfo(), json_nalu);
+	if (sps_)
+		json_nalu["sps"] = hevc_sps_to_json(sps_.get());
+	return json_nalu.toStyledString();
+}
+
+std::string HevcNaluSps::ExtraInfo()
+{
+	if (sps_)
+		return hevc_sps_to_json(sps_.get()).toStyledString();
+	return "";
+}
+
+HevcNaluPps::HevcNaluPps(ByteReader& data, uint32_t nalu_len_size, const std::shared_ptr<DemuxInterface>& demux_output)
+	: HevcNaluBase(data, nalu_len_size, demux_output)
+{
+	if (!is_good_) //NaluBase parse error
+		return;
+	is_good_ = false;
+	if (nalu_header_->nal_unit_type_ != HevcNaluTypePPS)
+		return;
+
+	pps_ = std::make_shared<hevc_pps_t>();
+	memset(pps_.get(), 0, sizeof(hevc_pps_t));
+	BitReader rbsp_data(rbsp_, rbsp_size_);
+	read_hevc_pic_parameter_set_rbsp(pps_.get(), rbsp_data);
+	ReleaseRbsp();
+	is_good_ = true;
+}
+
+std::string HevcNaluPps::CompleteInfo()
+{
+	Json::Value json_nalu;
+	Json::Reader reader;
+	reader.parse(HevcNaluBase::CompleteInfo(), json_nalu);
+	if (pps_)
+		json_nalu["pps"] = hevc_pps_to_json(pps_.get());
+	return json_nalu.toStyledString();
+}
+
+std::string HevcNaluPps::ExtraInfo()
+{
+	if (pps_)
+		return hevc_pps_to_json(pps_.get()).toStyledString();
 	return "";
 }
 
@@ -2011,10 +2136,16 @@ HevcNaluSlice::HevcNaluSlice(ByteReader& data, uint32_t nalu_size, const std::sh
 		return;
 	is_good_ = false;
 
+	HevcNaluSps* current_sps = (HevcNaluSps*)HevcNaluBase::CurrentSps.get();
+	HevcNaluPps* current_pps = (HevcNaluPps*)HevcNaluBase::CurrentPps.get();
+	if (!current_sps || !current_pps) {
+		return;
+	}
+
 	slice_header_ = std::make_shared<hevc_slice_header_t>();
 	memset(slice_header_.get(), 0, sizeof(hevc_slice_header_t));
 	BitReader rbsp_data(rbsp_, rbsp_size_);
-	hevc_slice_segment_header(slice_header_.get(), rbsp_data, nalu_header_->nal_unit_type_);
+	hevc_slice_segment_header(slice_header_.get(), rbsp_data, nalu_header_->nal_unit_type_, current_sps->sps_.get(), current_pps->pps_.get());
 	if (slice_header_->first_slice_segment_in_pic_flag == 0)
 	{
 		printf("Warning: multi-slice!\n");
@@ -2023,14 +2154,76 @@ HevcNaluSlice::HevcNaluSlice(ByteReader& data, uint32_t nalu_size, const std::sh
 	is_good_ = true;
 }
 
-std::string HevcNaluSlice::CompleteInfo()
+std::string HevcNaluSlice::CompleteInfo() 
 {
 	Json::Value json_nalu;
 	Json::Reader reader;
 	reader.parse(HevcNaluBase::CompleteInfo(), json_nalu);
-	if (slice_header_)
-		json_nalu["slice_header"] = hevc_slice_segment_header_to_json(slice_header_.get());
+	Json::Value json_slice_header = SliceHeaderToJson();
+	if (!json_slice_header.empty()) {
+		json_nalu["slice_header"] = json_slice_header;
+	}
 	return json_nalu.toStyledString();
+}
+
+Json::Value HevcNaluSlice::SliceHeaderToJson() {
+	HevcNaluSps* current_sps = (HevcNaluSps*)HevcNaluBase::CurrentSps.get();
+	HevcNaluPps* current_pps = (HevcNaluPps*)HevcNaluBase::CurrentPps.get();
+	if (slice_header_ && current_sps && current_pps) {
+		return hevc_slice_segment_header_to_json(slice_header_.get(), nalu_header_->nal_unit_type_, 
+			current_sps->sps_.get(), current_pps->pps_.get());
+	}
+	return Json::Value();
+}
+
+int8_t HevcNaluSlice::FirstMbInSlice() 
+{
+	if (slice_header_)
+		return slice_header_->first_slice_segment_in_pic_flag;
+	return HevcNaluBase::FirstMbInSlice();
+}
+
+std::string HevcNaluSlice::SliceType() 
+{
+	if (slice_header_)
+		return hevc_slice_type_string(slice_header_->slice_type);
+	return HevcNaluBase::SliceType();
+}
+
+int HevcNaluSlice::PicParameterSetId() 
+{
+	if (slice_header_)
+		return slice_header_->slice_pic_parameter_set_id;
+	return HevcNaluBase::PicParameterSetId();
+}
+
+int HevcNaluSlice::FrameNum() 
+{
+	return HevcNaluBase::FrameNum();
+}
+
+int HevcNaluSlice::FieldPicFlag() 
+{
+	return HevcNaluBase::FieldPicFlag();
+}
+
+int HevcNaluSlice::PicOrderCntLsb() 
+{
+	if (slice_header_)
+		return slice_header_->slice_pic_order_cnt_lsb;
+	return HevcNaluBase::PicOrderCntLsb();
+}
+
+int HevcNaluSlice::SliceQpDelta() 
+{
+	if (slice_header_)
+		return slice_header_->slice_qp_delta;
+	return HevcNaluBase::SliceQpDelta();
+}
+
+std::string HevcNaluSlice::ExtraInfo() 
+{
+	return SliceHeaderToJson().toStyledString();
 }
 
 VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)

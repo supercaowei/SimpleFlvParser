@@ -314,6 +314,23 @@ uint32_t BitReader::ReadU8()
 	return ReadU(8);
 }
 
+int CeilLog2(int x)
+{
+	int log = 0;
+	if (x < 0) { x = 0; }
+	while ((x >> log) > 0)
+	{
+		log++;
+	}
+	if (log > 0 && x == 1 << (log - 1)) { log--; }
+	return log;
+}
+
+uint32_t BitReader::ReadUV(int toLog2) 
+{
+	return ReadU(CeilLog2(toLog2));
+}
+
 uint32_t BitReader::ReadUE()
 {
 	int32_t r = 0;

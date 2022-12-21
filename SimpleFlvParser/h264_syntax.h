@@ -5,6 +5,9 @@
 #include <string>
 #include "json/value.h"
 
+#define MAX_ARRAY_SIZE 16
+#define SAFE_ARRAY_SIZE(n) (n < MAX_ARRAY_SIZE ? n : MAX_ARRAY_SIZE)
+
 //7.4.3 Table 7-6. Name association to slice_type
 #define SLICE_TYPE_P        0        // P (P slice)
 #define SLICE_TYPE_B        1        // B (B slice)
@@ -45,7 +48,7 @@ Sequence Parameter Set
 @see write_seq_parameter_set_rbsp
 @see debug_sps
 */
-typedef struct 
+typedef struct sps_t
 {
 	int profile_idc;
 	int constraint_set0_flag;
@@ -148,7 +151,7 @@ Picture Parameter Set
 @see write_pic_parameter_set_rbsp
 @see debug_pps
 */
-typedef struct
+typedef struct pps_t
 {
 	int pic_parameter_set_id;
 	int seq_parameter_set_id;
@@ -195,7 +198,7 @@ Slice Header
 @see write_slice_header_rbsp
 @see debug_slice_header_rbsp
 */
-typedef struct
+typedef struct slice_header_t
 {
 	int first_mb_in_slice;
 	int slice_type;
@@ -271,12 +274,6 @@ typedef struct
 } sei_t;
 
 class BitReader;
-
-void read_rbsp_trailing_bits(BitReader& b);
-
-int _read_ff_coded_number(BitReader& b);
-
-int more_rbsp_data(BitReader& b);
 
 int  nal_to_rbsp(const uint8_t* nal_buf, int* nal_size, uint8_t* rbsp_buf, int* rbsp_size);
 

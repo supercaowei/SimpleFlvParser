@@ -481,18 +481,6 @@ int more_rbsp_data(BitReader& b)
 	return 1;
 }
 
-int intlog2(int x)
-{
-	int log = 0;
-	if (x < 0) { x = 0; }
-	while ((x >> log) > 0)
-	{
-		log++;
-	}
-	if (log > 0 && x == 1 << (log - 1)) { log--; }
-	return log;
-}
-
 //7.3.2.2 Picture parameter set RBSP syntax
 void read_pic_parameter_set_rbsp(pps_t* pps, BitReader& b)
 {
@@ -535,7 +523,7 @@ void read_pic_parameter_set_rbsp(pps_t* pps, BitReader& b)
 			pps->pic_size_in_map_units_minus1 = b.ReadUE();
 			for (i = 0; i <= pps->pic_size_in_map_units_minus1; i++)
 			{
-				pps->slice_group_id[i] = b.ReadU(intlog2(pps->num_slice_groups_minus1 + 1)); // was u(v)
+				pps->slice_group_id[i] = b.ReadUV(pps->num_slice_groups_minus1 + 1); //u(v)
 			}
 		}
 	}
@@ -1091,8 +1079,8 @@ void read_slice_header_rbsp(slice_header_t* sh, BitReader& b, uint8_t nal_unit_t
 	{
 		printf("caution: slice_group_change_cycle size may be error.\n");
 		//see slice_group_change_cycle in 7.4.3
-		sh->slice_group_change_cycle = b.ReadU(intlog2(
-			(pps->pic_size_in_map_units_minus1 + 1) / (pps->slice_group_change_rate_minus1 + 1) + 1)); // was u(v)
+		sh->slice_group_change_cycle = b.ReadUV(
+			(pps->pic_size_in_map_units_minus1 + 1) / (pps->slice_group_change_rate_minus1 + 1) + 1); //u(v)
 	}
 }
 

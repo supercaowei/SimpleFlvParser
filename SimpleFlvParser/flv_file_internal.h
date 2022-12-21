@@ -641,6 +641,10 @@ protected:
 	bool is_good_ = false;
 	uint8_t *rbsp_ = NULL;
 	uint32_t rbsp_size_ = 0;
+	
+	static std::shared_ptr<HevcNaluBase> CurrentVps;
+	static std::shared_ptr<HevcNaluBase> CurrentSps;
+	static std::shared_ptr<HevcNaluBase> CurrentPps;
 };
 
 class HevcNaluSEI : public HevcNaluBase
@@ -657,11 +661,53 @@ private:
 	uint32_t sei_num_ = 0;
 };
 
+class HevcNaluVps : public HevcNaluBase
+{
+public:
+	HevcNaluVps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	std::shared_ptr<hevc_vps_t> vps_;
+
+	virtual std::string CompleteInfo() override;
+	virtual std::string ExtraInfo() override;
+};
+
+class HevcNaluSps : public HevcNaluBase
+{
+public:
+	HevcNaluSps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	std::shared_ptr<hevc_sps_t> sps_;
+
+	virtual std::string CompleteInfo() override;
+	virtual std::string ExtraInfo() override;
+};
+
+class HevcNaluPps : public HevcNaluBase
+{
+public:
+	HevcNaluPps(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+	std::shared_ptr<hevc_pps_t> pps_;
+
+	virtual std::string CompleteInfo() override;
+	virtual std::string ExtraInfo() override;
+};
+
 class HevcNaluSlice : public HevcNaluBase
 {
 public:
 	HevcNaluSlice(ByteReader& data, uint32_t nalu_size, const std::shared_ptr<DemuxInterface>& demux_output = NULL);
+
 	virtual std::string CompleteInfo() override;
+	virtual int8_t FirstMbInSlice() override;
+	virtual std::string SliceType() override;
+	virtual int PicParameterSetId() override;
+	virtual int FrameNum() override;
+	virtual int FieldPicFlag() override;
+	virtual int PicOrderCntLsb() override;
+	virtual int SliceQpDelta() override;
+	virtual std::string ExtraInfo() override;
+
+private:
+	Json::Value SliceHeaderToJson();
 
 private:
 	std::shared_ptr<hevc_slice_header_t> slice_header_;
