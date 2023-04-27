@@ -282,19 +282,15 @@ uint32_t BitReader::ReadU(int nbits)
 
 void BitReader::SkipU(int nbits)
 {
-	if ((end_ - p_ - 1) * 8 + bits_left_ <= nbits) {
-		p_ = end_; //reach end
-		bits_left_ = 8;
-	}
-
-	p_ += nbits / 8;
-	nbits = nbits % 8;
-	if (nbits > bits_left_) {
-		p_++;
-		bits_left_ = 8 - (nbits - bits_left_);
-	} else {
+	if (nbits < bits_left_) {
 		bits_left_ -= nbits;
+		return;
 	}
+	nbits -= bits_left_;
+	p_++;
+	bits_left_ = 8;
+	p_ += nbits / 8;
+	bits_left_ -= nbits % 8;
 }
 
 uint32_t BitReader::ReadF(int nbits) 
