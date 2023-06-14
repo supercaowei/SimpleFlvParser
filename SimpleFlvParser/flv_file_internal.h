@@ -602,6 +602,7 @@ std::string GetHevcNaluTypeString(HevcNaluType type);
 struct HevcNaluHeader
 {
 	HevcNaluType nal_unit_type_;
+	uint8_t nuh_temporal_id_plus1_;
 	HevcNaluHeader(uint16_t b);
 };
 

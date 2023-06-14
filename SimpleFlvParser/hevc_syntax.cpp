@@ -561,7 +561,8 @@ void read_hevc_video_parameter_set_rbsp(hevc_vps_t* s, BitReader& b)
 	int i, j;
 	memset(s, 0, sizeof(hevc_vps_t));
 	s->vps_video_parameter_set_id = b.ReadU(4); 
-	s->vps_reserved_three_2bits = b.ReadU(2); 
+	s->vps_base_layer_internal_flag = b.ReadU(1); 
+	s->vps_base_layer_available_flag = b.ReadU(1); 
 	s->vps_max_layers_minus1 = b.ReadU(6); 
 	s->vps_max_sub_layers_minus1 = b.ReadU(3); 
 	s->vps_temporal_id_nesting_flag = b.ReadU(1); 
@@ -605,6 +606,8 @@ Json::Value hevc_vps_to_json(hevc_vps_t* vps)
 {
 	Json::Value json_vps;
 	json_vps["vps_video_parameter_set_id"] = vps->vps_video_parameter_set_id;
+	json_vps["vps_base_layer_internal_flag"] = vps->vps_base_layer_internal_flag;
+	json_vps["vps_base_layer_available_flag"] = vps->vps_base_layer_available_flag;
 	json_vps["vps_max_layers_minus1"] = vps->vps_max_layers_minus1;
 	json_vps["vps_max_sub_layers_minus1"] = vps->vps_max_sub_layers_minus1;
 	json_vps["vps_temporal_id_nesting_flag"] = vps->vps_temporal_id_nesting_flag;

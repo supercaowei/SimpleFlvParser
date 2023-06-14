@@ -251,7 +251,8 @@ typedef struct pred_weight_table_t {
 typedef struct hevc_vps_t 
 {
 	int vps_video_parameter_set_id;
-	int vps_reserved_three_2bits;
+	int vps_base_layer_internal_flag;
+	int vps_base_layer_available_flag;
 	int vps_max_layers_minus1;
 	int vps_max_sub_layers_minus1;
 	int vps_temporal_id_nesting_flag;

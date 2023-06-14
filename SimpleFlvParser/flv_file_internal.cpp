@@ -1780,6 +1780,7 @@ std::string GetHevcNaluTypeString(HevcNaluType type)
 HevcNaluHeader::HevcNaluHeader(uint16_t b)
 {
 	nal_unit_type_ = (HevcNaluType)((b >> 9) & 0x3F);
+	nuh_temporal_id_plus1_ = (b & 0x03);
 }
 
 std::shared_ptr<HevcNaluBase> HevcNaluBase::CurrentVps;
@@ -2223,7 +2224,11 @@ int HevcNaluSlice::SliceQpDelta()
 
 std::string HevcNaluSlice::ExtraInfo() 
 {
-	return SliceHeaderToJson().toStyledString();
+	auto json = SliceHeaderToJson();
+	if (nalu_header_) {
+		json["nuh_temporal_id_plus1"] = nalu_header_->nuh_temporal_id_plus1_;
+	}
+	return json.toStyledString();
 }
 
 VideoTagBodyHEVCNalu::VideoTagBodyHEVCNalu(ByteReader& data, const std::shared_ptr<DemuxInterface>& demux_output)
